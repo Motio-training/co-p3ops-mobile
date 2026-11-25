@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#e8590c" />
+    <title>CO - P3OPS Mobile</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/mobile.css" />
+    <script>
+      // Diagnostic écrit en JavaScript ancien (ES5) : si l'interface ne démarre pas, un message remplace la page blanche.
+      (function () {
+        var errors = [];
+        window.addEventListener(
+          'error',
+          function (e) {
+            var where = e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : '';
+            errors.push((e.message || 'erreur de chargement') + where);
+          },
+          true
+        );
+        function esc(s) {
+          return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        window.__p3opsFallback = function (reason) {
+          if (window.__p3opsStarted || document.getElementById('fallback')) return;
+          var ua = navigator.userAgent;
+          var m = ua.match(/(Edg|Chrome|Firefox)\/(\d+)/);
+          var nav = m ? (m[1] === 'Edg' ? 'Microsoft Edge ' : m[1] + ' ') + m[2] : 'navigateur inconnu';
+          var box = document.createElement('div');
+          box.id = 'fallback';
+          box.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#f4f5f7;font-family:system-ui,sans-serif;color:#1b2330;padding:24px 16px;overflow:auto;z-index:9999';
+          box.innerHTML =
+            '<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e5ea;border-radius:10px;padding:22px">' +
+            '<h1 style="font-size:20px;margin:0 0 12px;color:#cc2f2f">CO - P3OPS Mobile ne peut pas s’afficher</h1>' +
+            '<p style="margin:0 0 10px">Navigateur utilisé : <b>' + esc(nav) + '</b></p>' +
+            '<p style="margin:0 0 10px">Ouvrez cette page avec <b>Google Chrome</b> à jour sur Android. Les autres navigateurs ne savent pas dialoguer avec le lecteur de puces.</p>' +
+            '<p style="margin:0;color:#586273;font-size:12px">Détail technique : ' + esc(reason) + (errors.length ? ' — ' + esc(errors.join(' ; ')) : '') + '<br>' + esc(ua) + '</p>' +
+            '</div>';
+          document.body.appendChild(box);
+        };
+        setTimeout(function () {
+          window.__p3opsFallback("l'interface ne s'est pas chargée");
+        }, 10000);
+      })();
+    </script>
+    <script nomodule>
+      window.onload = function () {
+        window.__p3opsFallback('ce navigateur ne gère pas les modules JavaScript');
+      };
+    </script>
+    <script type="module" src="js/mobile/boot.js"></script>
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <noscript>CO - P3OPS nécessite JavaScript (Google Chrome).</noscript>
+    </div>
+  </body>
+</html>

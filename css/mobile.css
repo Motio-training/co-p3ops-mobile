@@ -1,0 +1,372 @@
+/* CO - P3OPS Mobile : mise en page téléphone. S'ajoute à styles.css (identique à la version PC). */
+
+/* Pas de « Quitter » sur téléphone : on ferme simplement l'application. */
+.mobile-app .quit-btn {
+  display: none;
+}
+
+/* Les catégories ne servent pas en course au score : menu allégé. */
+.mobile-app a.nav-item[href$='/categories'] {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 15px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ---------- Accueil ---------- */
+  .home {
+    padding: max(20px, env(safe-area-inset-top)) 16px 32px;
+  }
+
+  .home-head {
+    margin-bottom: 18px;
+  }
+
+  .brand-lg h1 {
+    font-size: 22px;
+  }
+
+  .home-main {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .home-tile.primary {
+    padding: 18px 16px;
+  }
+
+  .home-tile.primary .home-tile-icon {
+    width: 52px;
+    height: 52px;
+  }
+
+  .home-tile.primary strong {
+    font-size: 19px;
+  }
+
+  .home-more {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .home-more .home-tile {
+    padding: 12px 14px;
+  }
+
+  /* ---------- Cadre d'une course : menu en bas de l'écran ---------- */
+  .app-shell {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    padding-bottom: calc(62px + env(safe-area-inset-bottom));
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.18);
+  }
+
+  .sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar-brand,
+  .nav-title,
+  .sidebar-foot .sync {
+    display: none;
+  }
+
+  .nav,
+  .nav-group,
+  .sidebar-foot {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Ordre du menu : déroulé, jour de course (lecture, résultats), puis préparation */
+  .nav > .nav-group:nth-child(1) {
+    order: 1;
+  }
+
+  .nav > .nav-group:nth-child(3) {
+    order: 2;
+  }
+
+  .nav > .nav-group:nth-child(2) {
+    order: 3;
+  }
+
+  .nav-item {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-width: 70px;
+    padding: 6px 6px;
+    font-size: 10.5px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .nav-item > span:not(.nav-count) {
+    max-width: 76px;
+  }
+
+  .nav-count {
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    padding: 0 5px;
+    font-size: 10px;
+  }
+
+  .main {
+    overflow: visible;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    height: auto;
+    min-height: 50px;
+    padding: max(6px, env(safe-area-inset-top)) 12px 6px;
+    gap: 8px;
+  }
+
+  .topbar-title {
+    min-width: 0;
+  }
+
+  .topbar-title strong {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topbar-title .muted {
+    display: none;
+  }
+
+  .page {
+    padding: 12px 12px 28px;
+    overflow: visible;
+  }
+
+  .page-head {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .page-head h1 {
+    font-size: 21px;
+  }
+
+  .page-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* ---------- Déroulé guidé ---------- */
+  .wizard {
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .wz-steps {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .wz-step {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+
+  .wz-step:not(.after) + .wz-step.after {
+    margin-left: 6px;
+  }
+
+  .wz-step button {
+    justify-content: center;
+    padding: 7px 2px;
+  }
+
+  .wz-step .wz-label {
+    display: none;
+  }
+
+  .wz-step.current {
+    flex: 3.2 1 0;
+  }
+
+  .wz-step.current .wz-label {
+    display: inline;
+  }
+
+  .wz-head {
+    padding: 18px 16px 4px;
+  }
+
+  .wz-head h1 {
+    font-size: 23px;
+  }
+
+  .wz-body {
+    padding: 8px 16px 18px;
+  }
+
+  .wz-lead {
+    font-size: 14.5px;
+  }
+
+  .wz-foot {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+
+  .wz-hint {
+    order: 3;
+    flex-basis: 100%;
+    text-align: left;
+  }
+
+  .wz-foot .btn-next {
+    margin-left: auto;
+  }
+
+  .wz-select-row select {
+    flex-basis: 100%;
+  }
+
+  .ready-panel h2 {
+    font-size: 24px;
+  }
+
+  .ready-panel .btn-start {
+    width: 100%;
+    justify-content: center;
+    padding: 18px 16px;
+    font-size: 19px;
+  }
+
+  .bareme-steps {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* ---------- Lecture des doigts ---------- */
+  .race-status-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .race-status {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .race-status-text strong {
+    font-size: 16px;
+  }
+
+  .race-count {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 12px;
+  }
+
+  .race-count-main b {
+    font-size: 30px;
+  }
+
+  .race-count-out {
+    margin-top: 0;
+    flex-basis: 100%;
+  }
+
+  .station-bar {
+    flex-wrap: wrap;
+  }
+
+  .station-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* ---------- Fenêtres : plein écran ---------- */
+  .modal-backdrop {
+    padding: 0;
+    place-items: stretch;
+  }
+
+  .modal {
+    max-width: none;
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .modal-body {
+    flex: 1;
+    padding: 14px 14px 6px;
+  }
+
+  .modal-foot {
+    flex-wrap: wrap;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .modal-foot .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .check-stats {
+    flex-wrap: wrap;
+  }
+
+  .check-stat {
+    flex: 1 1 30%;
+    padding: 8px 10px;
+  }
+
+  /* Boutons plus faciles à toucher */
+  .btn {
+    min-height: 40px;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+  }
+
+  .input {
+    font-size: 16px; /* évite le zoom automatique du téléphone */
+  }
+
+  .toast-host,
+  .toasts {
+    bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+}
