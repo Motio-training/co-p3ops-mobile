@@ -1,6 +1,8 @@
 // Résultats par catégorie (ou par section), temps intermédiaires, impressions et exports.
 import { html, useState } from '../../lib.js';
-import { getDerived } from '../../core/store.js';
+import { getDerived, store } from '../../core/store.js';
+import { isScoreMode } from '../../domain/results.js';
+import { openExportPreview } from './export-preview.js';
 import { toast } from '../../core/bus.js';
 import { personName } from '../../core/util.js';
 import { fmtBehind, fmtDuration } from '../../core/time.js';
@@ -20,7 +22,9 @@ import { CompetitorModal } from './competitors.js';
 
 const km = (m) => (m ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : '');
 
+/** Export Excel : en mode score, aperçu du tableau (remarques modifiables) avant le téléchargement. */
 export async function runExcelExport() {
+  if (isScoreMode(store.event)) return openExportPreview();
   try {
     await exportExcel();
     toast('Fichier Excel téléchargé (dossier Téléchargements).', 'success');

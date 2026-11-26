@@ -179,6 +179,7 @@ async function getSettings() {
     await putSetting('_initial', seen);
   }
   delete stored._initial;
+  delete stored._initialEvents;
   return stored;
 }
 
@@ -237,7 +238,36 @@ function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }
 
+// Courses du PC incluses dans l'application Android (fichier absent de la version web publique, car elles
+// contiennent des noms) : ajoutées une seule fois ; une course supprimée sur la tablette ne revient pas.
+let initialEventsDone = null;
+function importInitialEvents() {
+  if (!initialEventsDone) {
+    initialEventsDone = (async () => {
+      let payloads = [];
+      try {
+        const r = await realFetch(new URL('courses-initiales.json', APP_BASE).href);
+        if (!r.ok) return;
+        payloads = await r.json();
+      } catch {
+        return;
+      }
+      const stored = (await tx('settings', 'readonly', (st) => req(st.get('_initialEvents'))))?.data || [];
+      const done = new Set(stored);
+      for (const p of payloads) {
+        const id = p?.event?.id;
+        if (!id || done.has(id)) continue;
+        done.add(id);
+        if (!(await exists(id))) await createEvent({ ...p.event }, id, p.docs || {});
+      }
+      await putSetting('_initialEvents', [...done]);
+    })().catch(() => {});
+  }
+  return initialEventsDone;
+}
+
 async function handle(method, parts, body) {
+  await importInitialEvents();
   if (parts[0] === 'xlsx' && method === 'POST') {
     const data = buildXlsx(body?.sheets || []);
     return new Response(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), { status: 200 });

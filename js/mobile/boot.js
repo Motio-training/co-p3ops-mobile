@@ -7,7 +7,8 @@ import './local-server.js';
 
 document.documentElement.classList.add('mobile-app');
 
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+// (Dans l'application Android, les fichiers sont déjà dans l'APK : pas de mise en cache.)
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !window.__P3OPS_APK) {
   addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });

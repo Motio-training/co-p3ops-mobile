@@ -188,10 +188,7 @@ export function GuidePage({ sub }) {
     if (ok) mutate(notRead.map((c) => putOp('competitor', { ...c, status: 'DNS' })));
   };
 
-  const doExport = async () => {
-    await runExcelExport();
-    updateEvent({ exportedAt: Date.now() });
-  };
+  const doExport = () => runExcelExport(); // aperçu du tableau, puis téléchargement
 
   const exportGroups = d.groups.map((g) => ({ g, rows: g.rows.filter((r) => r.comp.lastName || r.comp.firstName || r.res.readId) })).filter((x) => x.rows.length);
   const badFirst = check('circuit').badFirst || [];

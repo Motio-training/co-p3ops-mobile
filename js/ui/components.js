@@ -71,7 +71,7 @@ export function Spinner({ label }) {
 }
 
 /** Fenêtre modale. Avec onSubmit, le contenu est un formulaire (Entrée valide). */
-export function Modal({ title, onClose, children, footer, size = 'md', onSubmit }) {
+export function Modal({ title, onClose, children, footer, size = 'md', onSubmit, autoFocus = true }) {
   const ref = useRef();
   useEffect(() => {
     const h = (e) => {
@@ -84,7 +84,7 @@ export function Modal({ title, onClose, children, footer, size = 'md', onSubmit 
     const first =
       ref.current?.querySelector('.modal-body input:not([type=checkbox]):not([type=radio]):not([disabled]), .modal-body select, .modal-body textarea') ||
       ref.current?.querySelector('button[type=submit]');
-    setTimeout(() => first?.focus(), 30);
+    if (autoFocus) setTimeout(() => first?.focus(), 30);
     return () => window.removeEventListener('keydown', h);
   }, []);
   const inner = html`

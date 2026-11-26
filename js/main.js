@@ -11,6 +11,7 @@ import { HomePage } from './ui/pages/home.js';
 import { DisplayPage } from './ui/pages/display.js';
 import { StationsPage } from './ui/pages/stations.js';
 import { SettingsPage } from './ui/pages/settings.js';
+import { ExportPreviewHost } from './ui/pages/export-preview.js';
 
 function App() {
   const route = useRoute();
@@ -21,7 +22,7 @@ function App() {
   else if (route[0] === 'circuits' || route[0] === 'baremes') content = html`<div class="page standalone"><${SettingsPage} tab=${route[0]} /></div>`;
   else if (route[0] === 'e' && route[1]) content = html`<${EventShell} eventId=${route[1]} page=${route[2]} sub=${route[3]} />`;
   else content = html`<${HomePage} />`;
-  return html`${content}<${ToastHost} /><${DialogHost} />`;
+  return html`${content}<${ExportPreviewHost} /><${ToastHost} /><${DialogHost} />`;
 }
 
 // Fermer la fenêtre alors que le boîtier est connecté demande confirmation.

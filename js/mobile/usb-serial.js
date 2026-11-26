@@ -177,7 +177,8 @@ class UsbSerial extends EventTarget {
 // La version téléphone passe toujours par ce pilote USB dès que le navigateur le permet : le port série
 // « natif » de Chrome sur Android ne voit pas le lecteur (« aucun appareil compatible »), et l'on ne peut
 // pas se fier au nom du système (Chrome en « version pour ordinateur » ne dit plus qu'il est sur Android).
-if ('usb' in navigator) {
+// (Dans l'application Android, c'est le pont Java « AndroidUsb » qui pilote le lecteur : on n'y touche pas.)
+if ('usb' in navigator && !window.__P3OPS_APK) {
   if ('serial' in navigator) Object.defineProperty(navigator, 'serialNative', { value: navigator.serial, configurable: true });
   Object.defineProperty(navigator, 'serial', { value: new UsbSerial(), configurable: true });
 }

@@ -107,7 +107,10 @@ export function resultsHtml({ classIds = null, includeRunning = false } = {}) {
 export function remarkFor(comp, res) {
   const bits = [];
   if (!comp.lastName && !comp.firstName) bits.push(`Nom non renseigné (puce ${comp.card ?? '?'})`);
-  if (res.status === 'RUN') bits.push('Puce non lue');
+  // Puce non lue : la remarque saisie dans l'aperçu de l'export (« Inapte », « Absent »…) remplace le texte par défaut
+  const own = !res.readId && (res.status === 'RUN' || res.status === 'DNS') ? String(comp.exportComment || '').trim() : '';
+  if (own) bits.push(own);
+  else if (res.status === 'RUN') bits.push('Puce non lue');
   else if (res.status === 'DNS') bits.push('Absent / non partant');
   else if (res.status === 'DNF') bits.push("Arrivée non poinçonnée : saisir l'heure d'arrivée");
   else if (res.status === 'DSQ') bits.push('Disqualifié');

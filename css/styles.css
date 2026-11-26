@@ -1288,6 +1288,7 @@ select.input {
   z-index: 100;
   background: rgba(15, 23, 32, 0.45);
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* un tableau large défile dans la fenêtre au lieu de l'élargir */
   place-items: center;
   padding: 24px;
   animation: fade 0.12s ease-out;
@@ -4554,5 +4555,136 @@ button.rank-row {
     flex-direction: row;
     align-items: center;
     gap: 10px;
+  }
+}
+
+/* --- Aperçu de l'export Excel des notes (remarques modifiables) --------------------------- */
+.xp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.xp-tab {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.xp-tab small {
+  color: var(--text-3);
+  margin-left: 4px;
+}
+.xp-tab.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.xp-tab.on small {
+  color: rgba(255, 255, 255, 0.8);
+}
+.xp-table {
+  overflow-x: auto;
+}
+.xp-table td {
+  vertical-align: top;
+}
+.xp-rem {
+  min-width: 260px;
+}
+.xp-unread td {
+  background: var(--warn-soft);
+}
+.xp-edit .input {
+  width: 100%;
+}
+.xp-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.xp-chip {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  border-radius: 14px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.xp-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.xp-chip.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.xp-first {
+  display: none;
+}
+/* Petit écran (téléphone, tablette en portrait) : une fiche par personne, la remarque en pleine largeur */
+@media (max-width: 700px) {
+  .xp-table thead,
+  .xp-table td.xp-firstcol {
+    display: none;
+  }
+  .xp-first {
+    display: inline;
+  }
+  .xp-table table,
+  .xp-table tbody,
+  .xp-table tr,
+  .xp-table td {
+    display: block;
+    width: auto;
+  }
+  .xp-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 14px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .xp-unread {
+    background: var(--warn-soft);
+  }
+  .xp-table td {
+    padding: 0 !important;
+    border: 0 !important;
+    background: none !important;
+    text-align: left !important;
+  }
+  .xp-table td.xp-name {
+    flex-basis: 100%;
+    font-size: 15px;
+  }
+  .xp-table td[data-l]:empty {
+    display: none;
+  }
+  .xp-table td[data-l]::before {
+    content: attr(data-l) ' : ';
+    color: var(--text-3);
+    font-family: var(--font);
+    font-size: 12.5px;
+  }
+  .xp-table td.xp-rem {
+    flex-basis: 100%;
+    min-width: 0;
+    margin-top: 4px;
+  }
+  .xp-table td.xp-rem::before {
+    display: block;
+  }
+  .xp-table .xp-edit .input {
+    font-size: 16px; /* évite le zoom automatique du téléphone */
   }
 }
