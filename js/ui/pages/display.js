@@ -198,12 +198,20 @@ function ScoreDisplay() {
   const rows = d.overall.rows.filter((r) => r.res.status !== 'RUN' && r.res.status !== 'DNS');
   const podium = rows.filter((r) => r.place != null).slice(0, 3);
   const rest = rows.filter((r) => !podium.includes(r));
-  const cols = w >= 1700 ? 3 : w >= 1100 ? 2 : 1;
-  const rowH = h >= 1000 ? 48 : 42;
-  const podiumH = h >= 900 ? 320 : 270;
+  // Tailles proportionnelles à l'écran (tablette, PC, téléviseur)
+  const cols = w >= 1700 ? 3 : w >= 1000 ? 2 : 1;
+  const rowH = Math.round(Math.min(70, Math.max(40, h * 0.055)));
+  const podiumH = Math.round(Math.min(460, Math.max(220, h * 0.36)));
+  // Compteurs : arrivés et encore sur le circuit (personnes inscrites avec une puce)
+  const comps = [...s.competitors.values()].filter((c) => (c.lastName || c.firstName) && c.card && c.status !== 'DNS');
+  const out = comps.filter((c) => !d.readsByComp.has(c.id)).length;
 
-  return html`<div class=${'display score-display' + (chrome ? '' : ' no-cursor')}>
+  return html`<div class=${'display score-display' + (chrome ? '' : ' no-cursor')} style=${`--row-h:${rowH}px`}>
     <button class=${'display-fs floating' + (chrome ? '' : ' hidden')} onClick=${toggleFs} title="Plein écran"><${Icon} name="maximize" size=${20} /></button>
+    <div class="display-count">
+      <span><b>${rows.length}</b> arrivé${rows.length > 1 ? 's' : ''}</span>
+      ${comps.length > 0 && html`<span class=${out ? 'on-course' : 'all-in'}>${out ? html`<b>${out}</b> sur le circuit` : 'Tout le monde est rentré'}</span>`}
+    </div>
     <section class="podium" style=${`height:${podiumH}px`}>
       ${rows.length
         ? [2, 1, 3].map(
@@ -212,8 +220,13 @@ function ScoreDisplay() {
         : html`<div class="display-empty">Le classement s'affichera ici dès les premières arrivées.</div>`}
     </section>
     <main class="rank-list" style=${`grid-template-columns:repeat(${cols},minmax(0,1fr))`}>
+      ${rest.length > 0 &&
+      Array.from(
+        { length: Math.min(cols, rest.length) },
+        (_, i) => html`<div class="rank-head" key=${'h' + i}><span class="d-pl">Rg</span><span class="d-name">Nom · section</span><span class="d-sub">Temps</span><span class="d-time">Note</span></div>`
+      )}
       ${rest.map(
-        (row) => html`<button type="button" key=${row.comp.id} class=${'rank-row' + (row.comp.id === shownComp ? ' selected' : '')} style=${`height:${rowH}px`} onClick=${() => pick(row.comp.id)}>
+        (row) => html`<button type="button" key=${row.comp.id} class=${'rank-row' + (row.comp.id === shownComp ? ' selected' : '')} onClick=${() => pick(row.comp.id)}>
           <span class="d-pl">${row.place ?? ''}</span>
           <span class="d-name">${personName(row.comp)}<small>${sectionOf(row.comp)}</small></span>
           <span class="d-sub mono">${row.res.status === 'OK' ? fmtDuration(row.res.time) : ''}</span>

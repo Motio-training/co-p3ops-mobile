@@ -4320,3 +4320,239 @@ tr.row-free:hover .free-chip {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* ---------- Écran plein écran (course au score) : tailles proportionnelles à l'écran ---------- */
+.score-display .podium-person strong {
+  font-size: clamp(18px, 2.1vw, 42px);
+  line-height: 1.15;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.score-display .podium-person span {
+  font-size: clamp(13px, 1.15vw, 22px);
+}
+
+.score-display .podium-rank {
+  width: clamp(36px, 3.3vw, 64px);
+  height: clamp(36px, 3.3vw, 64px);
+  font-size: clamp(18px, 1.7vw, 32px);
+}
+
+.score-display .podium-step.p1 .podium-rank {
+  width: clamp(44px, 4vw, 78px);
+  height: clamp(44px, 4vw, 78px);
+  font-size: clamp(22px, 2.1vw, 40px);
+}
+
+.score-display .podium-time {
+  font-size: clamp(28px, 4vw, 86px);
+}
+
+.score-display .podium-note {
+  font-size: clamp(15px, 1.5vw, 30px);
+}
+
+.score-display .podium-block {
+  min-height: clamp(86px, 11vh, 150px);
+}
+
+.rank-list {
+  grid-auto-rows: var(--row-h, 44px);
+}
+
+.rank-row,
+button.rank-row {
+  height: var(--row-h, 44px);
+  font-size: clamp(16px, 1.45vw, 30px);
+}
+
+.rank-row .d-name small {
+  font-size: 0.72em;
+}
+
+.rank-row .d-sub {
+  font-size: 0.82em;
+  min-width: 4.5em;
+}
+
+.rank-row .d-time small {
+  font-size: 0.65em;
+}
+
+.rank-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 18px 4px;
+  color: #6f8098;
+  font-size: clamp(11px, 0.85vw, 16px);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid #1d2d42;
+}
+
+.rank-head .d-pl {
+  color: inherit;
+  font-weight: 600;
+}
+
+.rank-head .d-name {
+  flex: 1;
+  max-width: none;
+  width: auto;
+  font-weight: 600;
+}
+
+.rank-head .d-sub {
+  min-width: 4.5em;
+  color: inherit;
+  font-size: inherit;
+}
+
+.rank-head .d-time {
+  font-weight: 600;
+}
+
+.display-count {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+  font-size: clamp(12px, 1vw, 18px);
+  color: #93a3b8;
+}
+
+.display-count span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.display-count b {
+  color: #fff;
+}
+
+.display-count .on-course b {
+  color: #ffb020;
+}
+
+.display-count .all-in {
+  color: #6fdc98;
+}
+
+.score-display .last-label {
+  font-size: clamp(12px, 0.9vw, 18px);
+}
+
+.score-display .last-who strong {
+  font-size: clamp(22px, 2.2vw, 46px);
+}
+
+.score-display .last-who > span:last-child {
+  font-size: clamp(14px, 1.1vw, 22px);
+}
+
+.score-display .last-fact > span {
+  font-size: clamp(11px, 0.85vw, 16px);
+}
+
+.score-display .last-fact b {
+  font-size: clamp(20px, 1.9vw, 40px);
+}
+
+.score-display .d-chip {
+  font-size: clamp(16px, 1.4vw, 30px);
+}
+
+.score-display .last-note {
+  min-width: clamp(130px, 12vw, 240px);
+  font-size: clamp(40px, 4vw, 84px);
+}
+
+.score-display .last-note small {
+  font-size: 0.45em;
+}
+
+.score-display .last-read {
+  min-height: clamp(100px, 14vh, 170px);
+}
+
+@media (max-width: 900px) {
+  .score-display .last-read {
+    flex-wrap: wrap;
+    gap: 10px 18px;
+  }
+
+  .score-display .last-fact.wide {
+    flex-basis: 100%;
+    order: 5;
+  }
+}
+
+.score-display .podium {
+  padding-top: clamp(40px, 6vh, 64px);
+}
+
+/* Bandeau du bas en portrait (tablette, téléphone) : nom et note en haut, détails en dessous */
+@media (max-width: 900px) {
+  .score-display .last-read {
+    display: grid;
+    grid-template-columns: auto repeat(3, minmax(0, 1fr)) auto;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 12px 10px;
+  }
+
+  .score-display .last-read > .last-nav {
+    grid-row: 1 / span 3;
+    grid-column: 1;
+    height: 100%;
+    max-height: 120px;
+  }
+
+  .score-display .last-read > .last-nav ~ .last-nav {
+    grid-column: 5;
+  }
+
+  .score-display .last-read > .last-who {
+    grid-row: 1;
+    grid-column: 2 / span 2;
+  }
+
+  .score-display .last-read > .last-note {
+    grid-row: 1;
+    grid-column: 4;
+    justify-self: end;
+    min-width: 0;
+    padding: 8px 16px;
+  }
+
+  .score-display .last-read > :nth-child(3) {
+    grid-row: 2;
+    grid-column: 2;
+  }
+
+  .score-display .last-read > :nth-child(5) {
+    grid-row: 2;
+    grid-column: 3;
+  }
+
+  .score-display .last-read > :nth-child(6) {
+    grid-row: 2;
+    grid-column: 4;
+  }
+
+  .score-display .last-read > .last-fact.wide {
+    grid-row: 3;
+    grid-column: 2 / span 3;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+}
