@@ -1,4 +1,4 @@
-// Coureurs : inscriptions, import CSV / IOF XML, fiche coureur.
+// Coureurs : inscriptions, import Excel (.xlsx) / CSV / IOF XML, fiche coureur.
 import { html, useMemo, useState } from '../../lib.js';
 import { confirmDialog, toast } from '../../core/bus.js';
 import { delOp, getDerived, mutate, put, putOp, store } from '../../core/store.js';
@@ -6,6 +6,7 @@ import { compareText, norm, personName, pickFile, readFileText, uid } from '../.
 import { fmtClock, fmtDuration } from '../../core/time.js';
 import { entryFields, guessMapping, parseCsv, rowToEntry } from '../../io/csv.js';
 import { parseEntries } from '../../io/iof.js';
+import { looksLikeZip, readXlsx } from '../../io/xlsx-read.js';
 import { exportCompetitorsCsv } from '../../io/reports.js';
 import { unassignRead } from '../../core/readout.js';
 import { isScoreMode, sectionLabel } from '../../domain/results.js';
@@ -287,9 +288,19 @@ export function EntriesImportModal({ source, onClose, onChange }) {
 
 /** Ouvre un fichier d'inscrits et renvoie la source à passer à ImportModal (ou null). */
 export async function chooseEntriesFile() {
-  const file = await pickFile('.csv,.txt,.xml,text/csv,text/xml');
+  const file = await pickFile('.xlsx,.csv,.txt,.xml,.xls,.ods,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/xml');
   if (!file) return null;
   try {
+    // Classeur Excel (.xlsx) : on lit la première feuille comme un tableau
+    const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+    if (looksLikeZip(head)) {
+      const sheet = await readXlsx(await file.arrayBuffer());
+      if (!sheet.rows.length) throw new Error('Le classeur ne contient aucune ligne sous les en-têtes.');
+      return { kind: 'csv', ...sheet, fileName: file.name };
+    }
+    if (/\.xls$/i.test(file.name) || (head[0] === 0xd0 && head[1] === 0xcf)) {
+      throw new Error('Ancien format Excel (.xls) : enregistrez le fichier au format « Classeur Excel (.xlsx) » puis réimportez-le.');
+    }
     const text = await readFileText(file);
     if (/^\s*</.test(text)) return { kind: 'xml', entries: parseEntries(text), fileName: file.name };
     const csv = parseCsv(text);
@@ -339,7 +350,7 @@ export function CompetitorsPage() {
       <${Menu}
         label="Importer / exporter"
         items=${[
-          { label: 'Importer un fichier (CSV, IOF XML)', icon: 'upload', onClick: importFile },
+          { label: 'Importer un fichier (Excel .xlsx, CSV, IOF XML)', icon: 'upload', onClick: importFile },
           score && { label: "Télécharger le Fichier d'inscription CO (vierge)", icon: 'download', onClick: downloadBlankFile },
           { label: 'Exporter la liste (CSV)', icon: 'download', onClick: exportCompetitorsCsv },
         ]}
@@ -347,7 +358,7 @@ export function CompetitorsPage() {
       <${Button} icon="plus" variant="primary" onClick=${() => setEditing('new')}>${score ? 'Nouveau personnel' : 'Nouveau coureur'}</${Button}>
     <//>
     ${s.competitors.size === 0
-      ? html`<div class="card"><${EmptyState} icon="users" title=${`Aucun ${word[0]} inscrit`} text="Importez le fichier des inscriptions (CSV, export SportSoftware ou IOF XML), ou ajoutez les personnes une par une.">
+      ? html`<div class="card"><${EmptyState} icon="users" title=${`Aucun ${word[0]} inscrit`} text="Importez le fichier des inscriptions (Excel .xlsx, CSV, export SportSoftware ou IOF XML), ou ajoutez les personnes une par une.">
           <${Button} icon="upload" onClick=${importFile}>Importer un fichier</${Button}>
           <${Button} icon="plus" variant="primary" onClick=${() => setEditing('new')}>Ajouter</${Button}>
         <//></div>`

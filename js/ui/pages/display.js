@@ -105,16 +105,24 @@ function LastRead() {
     </footer>`;
   }
   const ok = res.status === 'OK' && res.note != null;
+  // 1re balise : celle poinçonnée en premier par le coureur, en vert si c'est la balise imposée, en rouge sinon
+  const first = res.first || {};
+  const firstClass = first.ok === true ? 'last-good' : first.ok === false ? 'last-bad' : '';
   return html`<footer class="last-read" key=${latest.id}>
     <div class="last-who">
       <span class="last-label">Dernière puce lue · ${at}</span>
       <strong>${personName(comp)}</strong>
-      <span>${sectionOf(comp)}</span>
+      <span>${sectionOf(comp)} · Puce <span class="mono">${latest.number}</span></span>
     </div>
     <div class="last-fact"><span>Balises validées</span><b>${res.validated ?? 0} / ${res.totalControls}</b></div>
     <div class="last-fact wide">
       <span>Postes manquants</span>
       ${res.missing.length ? html`<b class="last-missing">${res.missing.map((c) => html`<span class="d-chip">${c}</span>`)}</b>` : html`<b class="last-none">aucun</b>`}
+    </div>
+    <div class="last-fact">
+      <span>Première balise</span>
+      <b class=${firstClass}>${first.punched ?? '—'}</b>
+      ${first.ok === false && first.expected != null && html`<small class="last-expected">imposée : ${first.expected}</small>`}
     </div>
     <div class="last-fact"><span>Temps</span><b class="mono">${res.time != null ? fmtDuration(res.time) : '—'}</b></div>
     <div class=${'last-note' + (ok ? '' : ' bad')}>${ok ? html`${res.note}<small>/20</small>` : html`<span class="last-status">${STATUS_LABEL[res.status]}</span>`}</div>

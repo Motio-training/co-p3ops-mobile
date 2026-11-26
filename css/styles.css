@@ -3905,8 +3905,18 @@ button.nav-item {
   font-size: 20px;
 }
 
-.last-fact b.last-none {
+.last-fact b.last-none,
+.last-fact b.last-good {
   color: #6fdc98;
+}
+
+.last-fact b.last-bad {
+  color: #ff7b72;
+}
+
+.last-expected {
+  color: #ffb3b3;
+  font-size: 14px;
 }
 
 .last-note {

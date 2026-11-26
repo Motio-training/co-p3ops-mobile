@@ -1,4 +1,4 @@
-// Contrôle strict du fichier d'inscription d'une course au score (Nom ; Prénom ; Section ; 1re balise ; Puce).
+// Contrôle strict du fichier d'inscription d'une course au score (Nom, Prenom, Section, 1re balise, Puce), en .xlsx ou CSV.
 // Le fichier n'est enregistré que s'il ne contient aucune erreur : sinon, la liste des cases à corriger
 // est affichée, l'utilisateur corrige le fichier puis le réimporte.
 import { norm } from '../core/util.js';
@@ -29,7 +29,7 @@ export function checkScoreFile(csv) {
   const missingCols = SCORE_COLUMNS.filter((c) => !(map[c.key] >= 0));
   if (missingCols.length) {
     for (const c of missingCols) {
-      errors.push({ line: 1, column: c.label, value: '', message: `Colonne « ${c.label} » introuvable. Utilisez le « Fichier d'inscription CO » (colonnes Nom ; Prénom ; Section ; 1re balise ; Puce).` });
+      errors.push({ line: 1, column: c.label, value: '', message: `Colonne « ${c.label} » introuvable. Utilisez le « Fichier d'inscription CO » (colonnes Nom, Prenom, Section, 1re balise, Puce).` });
     }
     return { errors, warnings, entries, named: [], nameless: [], sections: [], map };
   }

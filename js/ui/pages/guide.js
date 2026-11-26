@@ -15,7 +15,7 @@ import { BaremeEditorModal, BaremeSummary } from './bareme.js';
 import { CircuitEditorModal } from './settings.js';
 import { runExcelExport } from './results.js';
 
-const BLANK_FILE_NAME = "Fichier d'inscription CO.csv";
+const BLANK_FILE_NAME = "Fichier d'inscription CO.xlsx";
 
 function Issue({ kind = 'warn', children, action }) {
   return html`<div class=${'issue issue-' + kind}>
@@ -200,7 +200,7 @@ export function GuidePage({ sub }) {
   // --- Contenu de chaque étape -----------------------------------------------------------------
   const body = {
     inscriptions: () => html`
-      <p class="wz-lead">Le fichier d'inscription contient déjà les puces et leur 1re balise. Complétez-le dans Excel, puis importez-le : CO - P3OPS vérifie chaque case avant de l'enregistrer.</p>
+      <p class="wz-lead">Le fichier d'inscription (Excel .xlsx) contient déjà les puces et leur 1re balise. Complétez-le dans Excel ou OpenOffice, puis importez-le : CO - P3OPS vérifie chaque case avant de l'enregistrer.</p>
       ${comps.length === 0
         ? html`<div class="wz-actions-big">
             <button type="button" class="wz-action" onClick=${downloadBlankFile}>
@@ -385,10 +385,10 @@ export function GuidePage({ sub }) {
 // Fichier d'inscription vierge : puces et 1res balises remplies, noms et sections à compléter.
 export async function downloadBlankFile() {
   try {
-    const res = await fetch('/modeles/fichier-inscription-vierge.csv');
+    const res = await fetch('/modeles/fichier-inscription-vierge.xlsx');
     if (!res.ok) throw new Error();
     downloadFile(BLANK_FILE_NAME, await res.blob());
-    toast(`« ${BLANK_FILE_NAME} » téléchargé (dossier Téléchargements) : complétez-le dans Excel puis importez-le.`, 'success');
+    toast(`« ${BLANK_FILE_NAME} » téléchargé (dossier Téléchargements) : complétez-le dans Excel ou OpenOffice, enregistrez-le en .xlsx puis importez-le.`, 'success');
   } catch {
     toast("Le fichier d'inscription vierge se télécharge depuis la version PC de CO - P3OPS.", 'error');
   }
