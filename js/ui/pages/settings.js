@@ -1,27 +1,18 @@
-// Réglages de l'application : bibliothèque de circuits et barèmes de notation.
+// Menus « Circuits » et « Barèmes » de l'accueil : circuits et barèmes communs à toutes les courses.
 import { html, useState } from '../../lib.js';
 import { confirmDialog, toast } from '../../core/bus.js';
 import { deleteBareme, deleteCircuit, saveCircuit } from '../../core/settings.js';
 import { Button, EmptyState, Field, Icon, IconButton, Modal, Spinner } from '../components.js';
 import { useSettings } from '../hooks.js';
-import { ControlChips, parseControls } from './courses.js';
+import { ControlChips } from './courses.js';
+import { ControlPicker } from './control-picker.js';
 import { BaremeEditorModal, BaremeSummary } from './bareme.js';
 
 /** Création / modification d'un circuit de la bibliothèque. */
 export function CircuitEditorModal({ circuit, onClose, onSaved }) {
   const [name, setName] = useState(circuit?.name || '');
-  const [text, setText] = useState((circuit?.controls || []).join(' '));
-  const { codes, bad } = parseControls(text);
-  const dups = [...new Set(codes.filter((c, i) => codes.indexOf(c) !== i))];
-  const error = !name.trim()
-    ? 'Donnez un nom au circuit.'
-    : bad.length
-      ? `Valeurs non reconnues : ${bad.join(', ')} (numéros de 1 à 1023 attendus).`
-      : !codes.length
-        ? 'Saisissez au moins une balise.'
-        : dups.length
-          ? `Balise en double : ${dups.join(', ')}.`
-          : '';
+  const [codes, setCodes] = useState([...(circuit?.controls || [])]);
+  const error = !name.trim() ? 'Donnez un nom au circuit.' : !codes.length ? 'Sélectionnez au moins une balise.' : '';
   const save = async () => {
     if (error) return;
     try {
@@ -35,17 +26,16 @@ export function CircuitEditorModal({ circuit, onClose, onSaved }) {
   };
   return html`<${Modal}
     title=${circuit?.id ? `Circuit « ${circuit.name} »` : 'Nouveau circuit'}
+    size="lg"
     onClose=${onClose}
     onSubmit=${save}
     footer=${html`<span class="text-err small">${error}</span><span class="spacer"></span>
       <${Button} onClick=${onClose}>Annuler</${Button}><${Button} type="submit" variant="primary" disabled=${!!error}>Enregistrer</${Button}>`}
   >
     <${Field} label="Nom du circuit"><input class="input" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Ex. : Circuit 20 balises" /><//>
-    <${Field} label="Numéros des balises" hint="Séparés par des espaces. En course au score, l'ordre n'a pas d'importance.">
-      <textarea class="input mono" rows="3" value=${text} onInput=${(e) => setText(e.target.value)} placeholder="31 32 33 34 35 …"></textarea>
-    <//>
-    <div class="field-label">Aperçu · ${codes.length} balise${codes.length > 1 ? 's' : ''}</div>
-    <${ControlChips} controls=${codes} />
+    <div class="field-label">Balises du circuit · touchez une balise pour l'ajouter ou la retirer</div>
+    <${ControlPicker} value=${codes} onChange=${setCodes} />
+    <p class="muted small mt">En course au score, l'ordre n'a pas d'importance. Pour une course en ligne, touchez les balises dans l'ordre de passage.</p>
   <//>`;
 }
 
@@ -129,29 +119,25 @@ function BaremesTab() {
   `;
 }
 
+/** Page « Circuits » ou « Barèmes » (ouverte depuis l'accueil). */
 export function SettingsPage({ tab = 'circuits' }) {
   const st = useSettings();
-  const tabs = [
-    { id: 'circuits', label: 'Circuits', icon: 'route' },
-    { id: 'baremes', label: 'Barèmes', icon: 'trophy' },
-  ];
-  const current = tabs.some((t) => t.id === tab) ? tab : 'circuits';
+  const current = tab === 'baremes' ? 'baremes' : 'circuits';
+  const head =
+    current === 'circuits'
+      ? { title: 'Circuits', sub: "Les circuits proposés à chaque nouvelle course. Les balises se choisissent d'un clic." }
+      : { title: 'Barèmes', sub: 'Les barèmes de notation proposés à chaque nouvelle course.' };
   return html`
     <header class="page-head">
       <div>
-        <h1>Réglages</h1>
-        <p class="page-sub">Circuits et barèmes communs à toutes les courses.</p>
+        <h1>${head.title}</h1>
+        <p class="page-sub">${head.sub}</p>
       </div>
       ${!location.hash.startsWith('#/e/') && html`<div class="page-actions"><${Button} icon="arrowLeft" onClick=${() => (location.hash = '#/')}>Accueil</${Button}></div>`}
     </header>
-    <div class="tabs">
-      ${tabs.map(
-        (t) => html`<a class=${'tab' + (current === t.id ? ' active' : '')} href=${`#/reglages/${t.id}`}><${Icon} name=${t.icon} size=${16} />${t.label}</a>`
-      )}
-    </div>
     ${st.error && html`<div class="banner banner-error"><${Icon} name="alert" /> ${st.error}</div>`}
     ${!st.loaded && !st.error
-      ? html`<${Spinner} label="Chargement des réglages…" />`
+      ? html`<${Spinner} label="Chargement…" />`
       : st.loaded && (current === 'circuits' ? html`<${CircuitsTab} />` : html`<${BaremesTab} />`)}
   `;
 }

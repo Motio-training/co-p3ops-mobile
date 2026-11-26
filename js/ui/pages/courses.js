@@ -6,6 +6,7 @@ import { compareText, norm, pickFile, readFileText, uid } from '../../core/util.
 import { parseCourseData } from '../../io/iof.js';
 import { Button, EmptyState, Field, IconButton, Modal, PageHeader } from '../components.js';
 import { useSettings, useStore } from '../hooks.js';
+import { ControlPicker } from './control-picker.js';
 
 export function parseControls(text) {
   const tokens = String(text || '')
@@ -37,9 +38,8 @@ export function CourseModal({ course, onClose, onSaved }) {
   const [name, setName] = useState(course?.name || '');
   const [length, setLength] = useState(course?.length ? String(course.length / 1000).replace('.', ',') : '');
   const [climb, setClimb] = useState(course?.climb ? String(course.climb) : '');
-  const [text, setText] = useState((course?.controls || []).join(' '));
-  const { codes, bad } = parseControls(text);
-  const valid = name.trim() && !bad.length;
+  const [codes, setCodes] = useState([...(course?.controls || [])]);
+  const valid = name.trim() && codes.length > 0;
   const save = () => {
     if (!valid) return;
     const lenNum = Number(String(length).replace(',', '.'));
@@ -57,6 +57,7 @@ export function CourseModal({ course, onClose, onSaved }) {
   };
   return html`<${Modal}
     title=${course ? `Circuit ${course.name}` : 'Nouveau circuit'}
+    size="lg"
     onClose=${onClose}
     onSubmit=${save}
     footer=${html`<${Button} onClick=${onClose}>Annuler</${Button}><${Button} type="submit" variant="primary" disabled=${!valid}>Enregistrer</${Button}>`}
@@ -66,15 +67,8 @@ export function CourseModal({ course, onClose, onSaved }) {
       <${Field} label="Longueur (km)"><input class="input" value=${length} onInput=${(e) => setLength(e.target.value)} inputmode="decimal" placeholder="4,5" /><//>
       <${Field} label="Dénivelé (m)"><input class="input" value=${climb} onInput=${(e) => setClimb(e.target.value)} inputmode="numeric" placeholder="120" /><//>
     </div>
-    <${Field}
-      label="Postes, dans l'ordre"
-      hint="Numéros de postes séparés par des espaces (le départ et l'arrivée sont implicites)."
-      error=${bad.length ? `Valeurs non reconnues : ${bad.join(', ')}` : ''}
-    >
-      <textarea class="input mono" rows="3" value=${text} onInput=${(e) => setText(e.target.value)} placeholder="31 45 52 38 61 100"></textarea>
-    <//>
-    <div class="field-label">Aperçu · ${codes.length} poste${codes.length > 1 ? 's' : ''}</div>
-    <${ControlChips} controls=${codes} />
+    <div class="field-label">${store.event?.mode === 'score' ? "Balises · touchez une balise pour l'ajouter ou la retirer" : "Postes · touchez-les dans l'ordre de passage"}</div>
+    <${ControlPicker} value=${codes} onChange=${setCodes} ordered=${store.event?.mode !== 'score'} />
   <//>`;
 }
 
@@ -134,7 +128,7 @@ function ImportModal({ data, onClose }) {
 }
 
 // --- Bibliothèque : circuits enregistrés dans les réglages de l'application ------------------------
-export function CourseLibrary({ onPick, emptyText = 'Aucun circuit enregistré : créez-en dans les Réglages (accueil).' }) {
+export function CourseLibrary({ onPick, emptyText = "Aucun circuit enregistré : créez-en dans le menu « Circuits » de l'accueil." }) {
   const st = useSettings();
   if (st.error) return html`<p class="text-err small">${st.error}</p>`;
   if (!st.loaded) return html`<p class="muted small">Chargement des circuits…</p>`;
@@ -177,7 +171,7 @@ export function applyLibraryCourse(src, { replace = null } = {}) {
 
 export function CourseLibraryModal({ onClose, replace = null }) {
   return html`<${Modal} title="Reprendre un circuit existant" size="lg" onClose=${onClose}>
-    <p class="muted small">Circuits enregistrés dans les réglages. ${replace ? `Les balises du circuit « ${replace.name} » seront remplacées.` : 'Le circuit choisi sera ajouté à cette épreuve.'}</p>
+    <p class="muted small">Circuits enregistrés dans le menu « Circuits ». ${replace ? `Les balises du circuit « ${replace.name} » seront remplacées.` : 'Le circuit choisi sera ajouté à cette épreuve.'}</p>
     <${CourseLibrary}
       onPick=${(src) => {
         applyLibraryCourse(src, { replace });

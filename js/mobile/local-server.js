@@ -6,7 +6,7 @@
 import { buildXlsx } from './xlsx.js';
 
 const KINDS = ['course', 'class', 'competitor', 'card'];
-const SETTING_KEYS = ['circuits', 'baremes'];
+const SETTING_KEYS = ['circuits', 'baremes', 'balises'];
 const DB_NAME = 'co-p3ops-mobile';
 
 // --- Stockage (IndexedDB) ------------------------------------------------------------------------

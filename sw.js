@@ -1,7 +1,7 @@
 // CO - P3OPS Mobile : fonctionnement hors connexion. Tous les fichiers de l'application sont gardés
 // dans le téléphone à la première ouverture ; ensuite l'appli s'ouvre même sans réseau.
 // (Fichier généré par mobile/construire-mobile.py : la liste et la version sont remplies à la construction.)
-const VERSION = "co-p3ops-mobile-20261126-f17e76b26b";
+const VERSION = "co-p3ops-mobile-20261126-1507cbea7b";
 const FILES = [
  "./",
  "css/mobile.css",
@@ -49,6 +49,7 @@ const FILES = [
  "js/ui/pages/bareme.js",
  "js/ui/pages/classes.js",
  "js/ui/pages/competitors.js",
+ "js/ui/pages/control-picker.js",
  "js/ui/pages/courses.js",
  "js/ui/pages/dashboard.js",
  "js/ui/pages/display.js",
@@ -71,7 +72,8 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(VERSION)
-      .then((cache) => cache.addAll(FILES))
+      // cache: 'reload' : chaque mise à jour télécharge les fichiers neufs (pas ceux gardés par le navigateur)
+      .then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });

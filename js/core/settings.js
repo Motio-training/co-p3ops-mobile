@@ -1,4 +1,4 @@
-// Réglages de l'application, communs à toutes les courses : bibliothèque de circuits et barèmes.
+// Réglages de l'application, communs à toutes les courses : circuits, barèmes et balises connues.
 // Ils sont enregistrés par le serveur (table « settings ») ; chaque course garde sa propre copie
 // du circuit et du barème choisis, pour que ses notes ne changent pas après coup.
 import { api } from './api.js';
@@ -6,7 +6,7 @@ import { bus } from './bus.js';
 import { norm, uid } from './util.js';
 import { DEFAULT_SCORING } from '../domain/scoring.js';
 
-export const settings = { loaded: false, error: null, circuits: [], baremes: [] };
+export const settings = { loaded: false, error: null, circuits: [], baremes: [], balises: [] };
 
 let loading = null;
 
@@ -50,7 +50,20 @@ export function loadSettings(force = false) {
         baremes = [defaultBareme()];
         await api.putSetting('baremes', baremes);
       }
-      Object.assign(settings, { loaded: true, error: null, circuits, baremes });
+      let balises = data.balises;
+      if (!Array.isArray(balises)) {
+        // Premier lancement : les balises des circuits connus et les boîtiers déjà contrôlés sur ce poste.
+        const codes = new Set(circuits.flatMap((c) => c.controls || []));
+        for (const e of stationLog()) if (e.mode === 0x02 && e.code) codes.add(e.code);
+        balises = [...codes].sort((a, b) => a - b).map((code) => ({ code }));
+        for (const e of stationLog().slice().reverse()) {
+          const b = balises.find((x) => x.code === e.code && e.mode === 0x02);
+          if (b) Object.assign(b, { serial: e.serial, battery: e.battery, drift: e.drift, checkedAt: e.at });
+        }
+        // (un serveur d'une version précédente, pas encore relancé, ne connaît pas ce réglage : on continue)
+        await api.putSetting('balises', balises).catch(() => {});
+      }
+      Object.assign(settings, { loaded: true, error: null, circuits, baremes, balises });
     } catch (e) {
       settings.error = e.message;
       loading = null;
@@ -72,6 +85,44 @@ async function save(key, list) {
     emit();
     throw e;
   }
+}
+
+/** Boîtiers lus ou programmés sur ce poste (journal de la page « Programmer les boîtiers »). */
+function stationLog() {
+  try {
+    return JSON.parse(localStorage.getItem('balise.boitiers') || '[]');
+  } catch {
+    return [];
+  }
+}
+
+// --- Balises connues (numéros des boîtiers « poste ») --------------------------------------------------
+const byCode = (a, b) => a.code - b.code;
+
+export function saveBalises(list) {
+  const seen = new Map();
+  for (const b of list) if (Number.isInteger(b.code) && b.code >= 1 && b.code <= 1023) seen.set(b.code, { ...(seen.get(b.code) || {}), ...b });
+  return save('balises', [...seen.values()].sort(byCode));
+}
+
+/** Ajoute des numéros de balises (sans doublon). */
+export function addBalises(codes) {
+  const known = new Set(settings.balises.map((b) => b.code));
+  const fresh = codes.filter((c) => !known.has(c)).map((code) => ({ code }));
+  return fresh.length ? saveBalises([...settings.balises, ...fresh]) : Promise.resolve();
+}
+
+export function removeBalise(code) {
+  return save('balises', settings.balises.filter((b) => b.code !== code));
+}
+
+/** Boîtier « poste » lu ou programmé : sa balise est ajoutée ou mise à jour (batterie, horloge, date). */
+export function noteBaliseChecked(info) {
+  if (!settings.loaded || info?.mode !== 0x02 || !info.code) return Promise.resolve();
+  const entry = { code: info.code, serial: info.serial, battery: info.batteryPercent ?? null, drift: info.drift ?? null, checkedAt: Date.now() };
+  const others = settings.balises.filter((b) => b.code !== info.code);
+  const prev = settings.balises.find((b) => b.code === info.code) || {};
+  return saveBalises([...others, { ...prev, ...entry }]);
 }
 
 export function saveCircuit(circuit) {

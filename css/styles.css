@@ -4097,3 +4097,226 @@ button.rank-row:focus-visible {
     padding-right: 18px;
   }
 }
+
+/* ---------- Personnels : puces sans nom, prêtes pour une inscription ---------- */
+.table tr.list-sep td {
+  background: var(--surface-2);
+  border-top: 2px solid var(--border-strong);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.table tr.list-sep strong {
+  margin-right: 10px;
+}
+
+.table tr.list-sep span {
+  color: var(--text-2);
+}
+
+.free-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+tr.row-free td {
+  color: var(--text-2);
+}
+
+tr.row-free:hover .free-chip {
+  text-decoration: underline;
+}
+
+/* ---------- État du lecteur dans le menu : rouge / orange / vert ---------- */
+.station-chip.chip-bad {
+  background: var(--err-soft);
+  color: var(--err);
+}
+
+.station-chip.chip-bad .dot {
+  background: var(--err);
+  animation: pulse 1.2s infinite;
+}
+
+.station-chip.chip-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.station-chip.chip-warn .dot {
+  background: var(--warn);
+}
+
+.station-chip.chip-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.station-chip.chip-ok .dot {
+  background: var(--ok);
+}
+
+.nav-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex: none;
+}
+
+.nav-count + .nav-dot {
+  margin-left: 6px;
+}
+
+.nav-dot.bad {
+  background: #ff5f5f;
+  box-shadow: 0 0 0 3px rgba(255, 95, 95, 0.2);
+  animation: pulse 1.2s infinite;
+}
+
+.nav-dot.warn {
+  background: #f0a83c;
+}
+
+.nav-dot.ok {
+  background: #3ccf7a;
+  box-shadow: 0 0 0 3px rgba(60, 207, 122, 0.2);
+}
+
+/* ---------- Choix des balises d'un circuit ---------- */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.picker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+}
+
+.picker-chip {
+  position: relative;
+  height: 44px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.picker-chip:hover {
+  border-color: var(--accent);
+}
+
+.picker-chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.picker-chip.unknown {
+  border-style: dashed;
+}
+
+.picker-chip small {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.picker-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 360px;
+}
+
+.picker-order {
+  margin: 0;
+  font-family: var(--mono);
+  word-break: break-word;
+}
+
+.balise-chip {
+  position: relative;
+  display: flex;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.balise-chip::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.balise-chip.level-ok::before {
+  background: var(--ok);
+}
+
+.balise-chip.level-warn::before {
+  background: var(--warn);
+}
+
+.balise-chip.level-err::before {
+  background: var(--err);
+}
+
+.balise-num {
+  flex: 1;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.balise-num:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.balise-num:disabled {
+  cursor: default;
+}
+
+.balise-del {
+  width: 26px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: var(--err-soft);
+  color: var(--err);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}

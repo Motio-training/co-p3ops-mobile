@@ -228,7 +228,7 @@ export function GuidePage({ sub }) {
     `,
 
     circuit: () => html`
-      <p class="wz-lead">Choisissez le circuit de la course dans la liste. Les circuits se créent et se modifient dans les Réglages (accueil).</p>
+      <p class="wz-lead">Choisissez le circuit de la course dans la liste. Les circuits se créent et se modifient dans le menu « Circuits » de l'accueil.</p>
       <div class="wz-select-row">
         <select class="input input-lg" value=${libCircuit ? libCircuit.id : ''} onChange=${(e) => applyCircuit(lib.circuits.find((c) => c.id === e.target.value))}>
           <option value="" disabled=${!!libCircuit}>${course && !libCircuit ? `Circuit actuel : ${course.controls.length} balises (hors liste)` : '— Choisir un circuit —'}</option>
@@ -244,7 +244,7 @@ export function GuidePage({ sub }) {
         <${ControlChips} controls=${course.controls} />
       </div>`}
       ${circuitChanged &&
-      html`<${Issue} action=${html`<${Button} small variant="primary" onClick=${() => applyCircuit(libCircuit)}>Mettre à jour</${Button}>`}>Le circuit « ${libCircuit.name} » a été modifié dans les réglages depuis qu'il a été choisi pour cette course.<//>`}
+      html`<${Issue} action=${html`<${Button} small variant="primary" onClick=${() => applyCircuit(libCircuit)}>Mettre à jour</${Button}>`}>Le circuit « ${libCircuit.name} » a été modifié dans le menu Circuits depuis qu'il a été choisi pour cette course.<//>`}
       ${badFirst.length > 0 &&
       html`<${Issue} kind="err">
         ${plural(badFirst.length, 'inscription a', 'inscriptions ont')} une 1re balise qui n'est pas dans ce circuit (${badFirstCodes.join(', ')}).
@@ -253,7 +253,7 @@ export function GuidePage({ sub }) {
     `,
 
     bareme: () => html`
-      <p class="wz-lead">Choisissez le barème de notation. Les barèmes se créent et se modifient dans les Réglages (accueil).</p>
+      <p class="wz-lead">Choisissez le barème de notation. Les barèmes se créent et se modifient dans le menu « Barèmes » de l'accueil.</p>
       <div class="wz-select-row">
         <select class="input input-lg" value=${libBareme ? libBareme.id : ''} onChange=${(e) => applyBareme(lib.baremes.find((b) => b.id === e.target.value))}>
           <option value="" disabled=${!!libBareme}>${ev.scoringConfirmed && !libBareme ? `${ev.scoringName || 'Barème actuel'} (hors liste)` : '— Choisir un barème —'}</option>
@@ -264,7 +264,7 @@ export function GuidePage({ sub }) {
       </div>
       ${ev.scoringConfirmed && html`<div class="wz-box mt"><${BaremeSummary} event=${ev} /></div>`}
       ${baremeChanged &&
-      html`<${Issue} action=${html`<${Button} small variant="primary" onClick=${() => applyBareme(libBareme)}>Mettre à jour</${Button}>`}>Le barème « ${libBareme.name} » a été modifié dans les réglages depuis qu'il a été choisi pour cette course.<//>`}
+      html`<${Issue} action=${html`<${Button} small variant="primary" onClick=${() => applyBareme(libBareme)}>Mettre à jour</${Button}>`}>Le barème « ${libBareme.name} » a été modifié dans le menu Barèmes depuis qu'il a été choisi pour cette course.<//>`}
       <p class="muted small mt">Le temps de chaque participant est compté à partir du poinçon du boîtier « Départ ».</p>
     `,
 

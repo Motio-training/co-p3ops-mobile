@@ -46,6 +46,7 @@ export function ScoreImportModal({ source, onClose, onRetry }) {
           section: e.section,
           firstControl: e.firstControl,
           card: e.card,
+          importLine: e.line, // ordre du fichier d'inscription (liste des puces sans nom)
           createdAt: prev?.createdAt || now,
         })
       );

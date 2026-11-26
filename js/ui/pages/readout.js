@@ -105,7 +105,7 @@ export function StationPanel() {
         <${Button} small onClick=${() => st.port.insert(simulatedCard('unknown'))}>Puce inconnue</${Button}>
       </div>`}
       ${st.connected || st.state === 'connecting'
-        ? html`<${Button} onClick=${() => station.disconnect()}>Déconnecter</${Button}>`
+        ? html`<${Button} onClick=${() => station.disconnect({ manual: true })}>Déconnecter</${Button}>`
         : html`<${Button} variant="primary" icon="plug" onClick=${() => connectReal(false)}>Connecter le boîtier</${Button}>
             <${Menu}
               label=""
@@ -135,7 +135,7 @@ function RaceStatus() {
   else if (st.state === 'connecting') problems.push({ text: 'Connexion au lecteur en cours…' });
   else if (!st.connected)
     problems.push({
-      text: st.state === 'error' ? `Lecteur déconnecté (${st.message || 'erreur'}). Vérifiez le câble USB puis reconnectez-le.` : 'Branchez le lecteur sur le téléphone avec un câble USB OTG, puis touchez « Connecter le lecteur » et choisissez-le dans la liste.',
+      text: st.state === 'error' ? `Lecteur déconnecté (${st.message || 'erreur'}). Vérifiez le câble USB puis reconnectez-le.` : "Branchez le lecteur sur le téléphone avec un câble USB OTG : il est reconnu tout seul. La toute première fois, touchez « Connecter le lecteur » et choisissez-le dans la liste.",
       action: html`<${Button} small variant="primary" icon="plug" onClick=${() => connectReal(false)}>Connecter le lecteur</${Button}>
         <${Menu}
           label=""

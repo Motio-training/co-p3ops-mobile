@@ -10,12 +10,14 @@ import { looksLikeZip, readXlsx } from '../../io/xlsx-read.js';
 import { exportCompetitorsCsv } from '../../io/reports.js';
 import { unassignRead } from '../../core/readout.js';
 import { isScoreMode, sectionLabel } from '../../domain/results.js';
-import { Badge, Button, EmptyState, Field, Menu, Modal, PageHeader, SearchInput, StatusPill, TimeInput } from '../components.js';
+import { Badge, Button, EmptyState, Field, Icon, Menu, Modal, PageHeader, SearchInput, StatusPill, TimeInput } from '../components.js';
 import { useStore } from '../hooks.js';
 import { sortedClasses } from './classes.js';
 import { SplitsTable, ScoreSummary } from './readout-view.js';
 import { downloadBlankFile } from './guide.js';
 import { ScoreImportModal } from './import-check.js';
+
+const hasName = (c) => !!(c.lastName || c.firstName);
 
 export const EMPTY_COMPETITOR = {
   firstName: '',
@@ -57,7 +59,10 @@ export function CompetitorModal({ comp, onClose, defaults = {} }) {
   const res = comp ? d.results.get(comp.id) : null;
   const cardNum = cardText.replace(/\D/g, '') ? Number(cardText.replace(/\D/g, '')) : null;
   const sameCard = cardNum ? [...store.competitors.values()].filter((o) => o.id !== comp?.id && Number(o.card) === cardNum) : [];
-  const valid = (c.lastName.trim() || c.firstName.trim() || cardNum) && (!cardText.trim() || cardNum);
+  // Inscription sur une puce « sans nom » (course au score) : nom, prénom et section obligatoires
+  const registering = score && comp && !hasName(comp);
+  const missing = registering ? [!c.lastName.trim() && 'le nom', !c.firstName.trim() && 'le prénom', !String(c.section || '').trim() && 'la section'].filter(Boolean) : [];
+  const valid = (c.lastName.trim() || c.firstName.trim() || cardNum) && (!cardText.trim() || cardNum) && !missing.length;
 
   const save = (again) => {
     if (!valid) return;
@@ -93,16 +98,17 @@ export function CompetitorModal({ comp, onClose, defaults = {} }) {
   };
 
   return html`<${Modal}
-    title=${comp ? personName(comp) : score ? 'Nouveau personnel' : 'Nouveau coureur'}
+    title=${registering ? `Inscrire un personnel sur la puce ${comp.card}` : comp ? personName(comp) : score ? 'Nouveau personnel' : 'Nouveau coureur'}
     size="lg"
     onClose=${onClose}
     onSubmit=${() => save(false)}
     footer=${html`
-      ${comp && html`<${Button} variant="ghost-danger" icon="trash" onClick=${del}>Supprimer</${Button}>`}
+      ${comp && !registering && html`<${Button} variant="ghost-danger" icon="trash" onClick=${del}>Supprimer</${Button}>`}
+      ${registering && missing.length > 0 && html`<span class="muted small">Renseignez ${missing.join(', ')}.</span>`}
       <span class="spacer"></span>
       <${Button} onClick=${onClose}>Annuler</${Button}>
       ${!comp && html`<${Button} onClick=${() => save(true)} disabled=${!valid}>Enregistrer et ajouter un autre</${Button}>`}
-      <${Button} type="submit" variant="primary" disabled=${!valid}>Enregistrer</${Button}>`}
+      <${Button} type="submit" variant="primary" icon=${registering ? 'userPlus' : null} disabled=${!valid}>${registering ? 'Inscrire' : 'Enregistrer'}</${Button}>`}
   >
     <${ClubDatalist} />
     <div class="form-grid">
@@ -338,7 +344,15 @@ export function CompetitorsPage() {
       return c.classId === classFilter;
     })
     .filter((c) => !nq || norm(`${c.lastName} ${c.firstName} ${c.club} ${c.section || ''} ${c.card || ''} ${c.bib || ''} ${c.licence || ''}`).includes(nq))
-    .sort((a, b) => compareText(a.lastName || '~', b.lastName || '~') || compareText(a.firstName, b.firstName) || (a.card || 0) - (b.card || 0));
+    // Les coureurs inscrits d'abord (ordre alphabétique), puis les puces sans nom (ordre du fichier d'inscription)
+    .sort((a, b) => {
+      const na = hasName(a);
+      const nb = hasName(b);
+      if (na !== nb) return na ? -1 : 1;
+      if (na) return compareText(a.lastName, b.lastName) || compareText(a.firstName, b.firstName) || (a.card || 0) - (b.card || 0);
+      return (a.importLine ?? 1e9) - (b.importLine ?? 1e9) || (a.card || 0) - (b.card || 0);
+    });
+  const namedCount = list.filter(hasName).length;
 
   const importFile = async () => {
     const src = await chooseEntriesFile();
@@ -379,19 +393,26 @@ export function CompetitorsPage() {
           <div class="table-wrap"><table class="table">
             <thead><tr><th>Nom</th>${score ? html`<th>Section</th><th class="num">1re balise</th>` : html`<th>Club</th><th>Catégorie</th>`}<th class="num">Puce</th><th class="num">Départ</th><th>Résultat</th></tr></thead>
             <tbody>
-              ${list.slice(0, limit).map((c) => {
+              ${list.slice(0, limit).map((c, i, shown) => {
                 const res = d.results.get(c.id);
                 const cls = s.classes.get(c.classId);
-                const named = c.lastName || c.firstName;
-                return html`<tr key=${c.id} class="clickable" onClick=${() => setEditing(c)}>
-                  <td>${named ? html`<strong>${personName(c)}</strong>` : html`<span class="muted">Sans nom</span>`}</td>
+                const named = hasName(c);
+                // Séparation entre les coureurs inscrits et les puces disponibles (sans nom)
+                const sep = !named && (i === 0 || hasName(shown[i - 1]))
+                  ? html`<tr class="list-sep" key="sep"><td colspan="6">
+                      <strong>Puces sans nom · ${list.length - namedCount}</strong>
+                      <span>Touchez une ligne pour inscrire un ${score ? 'personnel' : 'coureur'} sur cette puce, même pendant la course.</span>
+                    </td></tr>`
+                  : null;
+                return html`${sep}<tr key=${c.id} class=${'clickable' + (named ? '' : ' row-free')} onClick=${() => setEditing(c)}>
+                  <td>${named ? html`<strong>${personName(c)}</strong>` : html`<span class="free-chip"><${Icon} name="userPlus" size=${15} /> Inscrire sur cette puce</span>`}</td>
                   ${score
                     ? html`<td>${c.section ? sectionLabel(c.section) : html`<span class="muted">—</span>`}</td><td class="num mono">${c.firstControl ?? ''}</td>`
                     : html`<td>${c.club}</td><td>${cls ? cls.name : html`<span class="text-warn">—</span>`}</td>`}
                   <td class="num mono">${c.card || html`<span class="text-warn">—</span>`}${c.rented ? html` <${Badge} kind="info" title="Puce prêtée">L<//>` : ''}</td>
                   <td class="num mono">${fmtClock(c.startTime)}</td>
                   <td>
-                    <${StatusPill} status=${res.status} nc=${c.nc} />
+                    ${!named && res.status === 'RUN' ? html`<span class="muted small">Disponible</span>` : html`<${StatusPill} status=${res.status} nc=${c.nc} />`}
                     ${score && res.note != null ? html` <strong>${res.note}/20</strong>` : ''}
                     ${res.time != null && res.status !== 'RUN' ? html` <span class="mono">${fmtDuration(res.time)}</span>` : ''}
                   </td>

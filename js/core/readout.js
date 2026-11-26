@@ -25,6 +25,8 @@ export function initReadout() {
     readout.reading = null;
     handleCard(e.detail.card, e.detail.source);
   });
+  // Le lecteur habituel est déjà branché au démarrage : il est connecté sans rien toucher.
+  station.autoConnect();
 }
 
 function sameCardData(a, b) {

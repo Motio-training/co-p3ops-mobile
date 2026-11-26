@@ -23,6 +23,12 @@ export const SI_USB_FILTERS = [
   { usbVendorId: 0x10c4, usbProductId: 0xea60 },
 ];
 
+/** Port USB d'un lecteur SportIdent (BSM7 / BSM8 : puce Silicon Labs, identifiants connus). */
+export function isSiPort(port) {
+  const a = port?.getInfo?.() || {};
+  return SI_USB_FILTERS.some((f) => f.usbVendorId === a.usbVendorId && f.usbProductId === a.usbProductId);
+}
+
 export function humanError(e) {
   const name = e?.name || '';
   const msg = e?.message || String(e || '');
@@ -55,6 +61,7 @@ export class Station extends EventTarget {
     this.reading = null;
     this.logLines = [];
     this.wanted = null; // port à reconnecter automatiquement s'il est rebranché
+    this.manualOff = false; // vrai après « Déconnecter » : pas de connexion automatique
     this.parser = new FrameParser({
       onFrame: (f) => this.onFrame(f),
       onControl: (b) => this.onControl(b),
@@ -65,13 +72,34 @@ export class Station extends EventTarget {
         if (e.target === this.port) this.lost('Le boîtier a été débranché.');
       });
       navigator.serial.addEventListener('connect', (e) => {
-        if (!this.wanted || this.state === 'connected' || this.state === 'connecting') return;
+        if (this.state === 'connected' || this.state === 'connecting') return;
         const a = e.target.getInfo?.() || {};
-        if (e.target === this.wanted.port || (a.usbVendorId === this.wanted.vid && a.usbProductId === this.wanted.pid)) {
-          this.log('i', null, 'Boîtier rebranché : reconnexion…');
+        const wantedPort = this.wanted && (e.target === this.wanted.port || (a.usbVendorId === this.wanted.vid && a.usbProductId === this.wanted.pid));
+        // Le lecteur habituel (déjà autorisé une fois) est rebranché : connexion automatique.
+        if (wantedPort || isSiPort(e.target)) {
+          this.manualOff = false;
+          this.log('i', null, 'Lecteur branché : connexion automatique…');
           setTimeout(() => this.connect(e.target).catch(() => {}), 600);
         }
       });
+    }
+  }
+
+  /**
+   * Connexion automatique au lecteur SportIdent déjà autorisé dans ce navigateur (la toute première
+   * fois, le navigateur impose de le choisir dans sa liste ; ensuite il est reconnu tout seul).
+   */
+  async autoConnect() {
+    if (!Station.supported || this.port || this.state === 'connecting' || this.manualOff) return false;
+    try {
+      const ports = await navigator.serial.getPorts();
+      const port = ports.find(isSiPort);
+      if (!port || this.port || this.state === 'connecting') return false;
+      this.log('i', null, 'Lecteur reconnu : connexion automatique…');
+      await this.connect(port);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -104,6 +132,7 @@ export class Station extends EventTarget {
   async choosePort({ anyPort = false } = {}) {
     if (!Station.supported) throw new Error("Ce navigateur ne gère pas Web Serial : utilisez Microsoft Edge ou Google Chrome.");
     const port = await navigator.serial.requestPort(anyPort ? {} : { filters: SI_USB_FILTERS });
+    this.manualOff = false;
     return this.connect(port);
   }
 
@@ -137,8 +166,10 @@ export class Station extends EventTarget {
     return this.info;
   }
 
-  async disconnect({ keepWanted = false } = {}) {
+  async disconnect({ keepWanted = false, manual = false } = {}) {
     if (!keepWanted) this.wanted = null;
+    // « Déconnecter » à la main : pas de reconnexion automatique avant que le lecteur soit rebranché.
+    if (manual) this.manualOff = true;
     await this.closePort();
     this.info = null;
     this.setState('disconnected');

@@ -66,12 +66,32 @@ function LoadModal({ onClose }) {
     go(`e/${id}`);
   };
 
+  // Course enregistrée sur un autre ordinateur ou téléphone (fichier de sauvegarde .balise.json)
+  const importFile = async () => {
+    const file = await pickFile('.json,application/json');
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await readFileText(file));
+      const { event } = await api.importEvent(payload);
+      toast(`Course « ${event.name} » importée.`, 'success');
+      open(event.id);
+    } catch (e) {
+      toast(e instanceof SyntaxError ? "Ce fichier n'est pas un fichier de course CO - P3OPS valide." : e.message, 'error');
+    }
+  };
+
   const nq = norm(q);
   const list = (events || [])
     .filter((it) => !nq || norm(`${it.event.name} ${it.event.place || ''} ${formatDate(it.event.date)}`).includes(nq))
     .sort((a, b) => compareText(b.event.date || '', a.event.date || '') || b.updated - a.updated);
 
-  return html`<${Modal} title="Charger une course" size="lg" onClose=${onClose}>
+  return html`<${Modal}
+    title="Charger une course"
+    size="lg"
+    onClose=${onClose}
+    footer=${!readonly && html`<span class="muted small">Course enregistrée sur un autre ordinateur ou un téléphone ?</span><span class="spacer"></span>
+      <${Button} icon="upload" onClick=${importFile}>Importer une course (fichier)</${Button}>`}
+  >
     ${error && html`<div class="banner banner-error"><${Icon} name="alert" /> ${error}</div>`}
     ${!events && !error && html`<${Spinner} label="Chargement…" />`}
     ${events && !events.length && html`<${EmptyState} icon="flag" title="Aucune course enregistrée" text="Créez une nouvelle course depuis l'accueil." />`}
@@ -132,19 +152,6 @@ export function HomePage() {
     }
   };
 
-  const importFile = async () => {
-    const file = await pickFile('.json,application/json');
-    if (!file) return;
-    try {
-      const payload = JSON.parse(await readFileText(file));
-      const { event } = await api.importEvent(payload);
-      toast(`Course « ${event.name} » importée.`, 'success');
-      go(`e/${event.id}`);
-    } catch (e) {
-      toast(e instanceof SyntaxError ? "Ce fichier n'est pas un fichier de course CO - P3OPS valide." : e.message, 'error');
-    }
-  };
-
   return html`<div class="home">
     <header class="home-head">
       <div class="brand-lg"><${Logo} size=${40} /><div><h1>CO - P3OPS</h1><p>Gestion de course d'orientation · SportIdent</p></div></div>
@@ -156,9 +163,9 @@ export function HomePage() {
     </div>
     ${!readonly &&
     html`<div class="home-more">
-      <${Tile} icon="upload" title="Importer une course" text="Fichier de sauvegarde .balise.json" onClick=${importFile} />
-      <${Tile} icon="settings" title="Programmer les boîtiers" text="Fonction, numéro, batterie, heure" onClick=${() => go('boitiers')} />
-      <${Tile} icon="list" title="Réglages" text="Circuits et barèmes" onClick=${() => go('reglages')} />
+      <${Tile} icon="route" title="Circuits" text="Créer et modifier les circuits" onClick=${() => go('circuits')} />
+      <${Tile} icon="trophy" title="Barèmes" text="Créer et modifier les barèmes" onClick=${() => go('baremes')} />
+      <${Tile} icon="settings" title="Programmer les boîtiers" text="Balises, fonction, batterie, heure" onClick=${() => go('boitiers')} />
     </div>`}
 
     <p class="home-foot muted">

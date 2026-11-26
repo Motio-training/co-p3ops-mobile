@@ -5,6 +5,7 @@ import { formatDate } from '../core/util.js';
 import { Icon, Logo } from './icons.js';
 import { Button, EmptyState, Spinner } from './components.js';
 import { go, useStation, useStore } from './hooks.js';
+import { MODE_READOUT } from '../sportident/constants.js';
 import { DashboardPage } from './pages/dashboard.js';
 import { CoursesPage } from './pages/courses.js';
 import { ClassesPage } from './pages/classes.js';
@@ -12,7 +13,7 @@ import { CompetitorsPage } from './pages/competitors.js';
 import { StartsPage } from './pages/starts.js';
 import { ReadoutPage } from './pages/readout.js';
 import { ResultsPage } from './pages/results.js';
-import { GuidePage } from './pages/guide.js';
+import { GuidePage, preparationChecks } from './pages/guide.js';
 import { isScoreMode } from '../domain/results.js';
 import { QuitButton } from './quit.js';
 import { StationsPage } from './pages/stations.js';
@@ -76,24 +77,31 @@ const NAV = [
   },
 ];
 
-function StationChip({ eventId }) {
-  const st = useStation();
-  const label = st.connected
-    ? st.reading
-      ? `Lecture ${st.reading.number}…`
-      : `${st.info?.model || 'Boîtier'} prêt${st.simulated ? ' (simulation)' : ''}`
-    : st.state === 'connecting'
-      ? 'Connexion…'
-      : st.state === 'error'
-        ? 'Boîtier déconnecté'
-        : 'Aucun boîtier';
-  return html`<a class=${'station-chip state-' + st.state + (st.reading ? ' reading' : '')} href=${`#/e/${eventId}/lecture`} title="Lecture des puces">
-    <span class="dot"></span>${label}
+/**
+ * État du lecteur pour le menu : rouge (non branché ou mal réglé), orange (branché, course à préparer),
+ * vert (branché, reconnu et course prête à être lancée).
+ */
+export function readerStatus(st, s) {
+  const score = isScoreMode(s.event);
+  const prepOk = !score || preparationChecks(s).every((c) => c.ok);
+  const badMode = st.connected && st.info?.mode != null && st.info.mode !== MODE_READOUT;
+  if (st.state === 'connecting') return { kind: 'warn', label: 'Connexion du lecteur…' };
+  if (!st.connected) return { kind: 'bad', label: st.state === 'error' ? 'Lecteur déconnecté' : 'Lecteur non branché' };
+  if (badMode) return { kind: 'bad', label: 'Lecteur pas en mode Lecture' };
+  if (st.reading) return { kind: 'ok', label: `Lecture de la puce ${st.reading.number}…`, reading: true };
+  if (!prepOk) return { kind: 'warn', label: 'Lecteur prêt · course à préparer' };
+  return { kind: 'ok', label: st.simulated ? 'Lecteur prêt (simulation)' : 'Lecteur prêt' };
+}
+
+function StationChip({ eventId, status }) {
+  return html`<a class=${'station-chip chip-' + status.kind + (status.reading ? ' reading' : '')} href=${`#/e/${eventId}/lecture`} title="Lecture des puces">
+    <span class="dot"></span>${status.label}
   </a>`;
 }
 
 export function EventShell({ eventId, page, sub }) {
   const s = useStore();
+  const st = useStation(); // le menu suit l'état du lecteur (rouge / orange / vert)
   useEffect(() => {
     openEvent(eventId);
   }, [eventId]);
@@ -116,6 +124,7 @@ export function EventShell({ eventId, page, sub }) {
   };
   const score = isScoreMode(s.event);
   const nav = score ? NAV_SCORE : NAV;
+  const status = readerStatus(st, s);
   const current = PAGES[page] ? page : score ? 'deroule' : 'tableau';
   const Page = PAGES[current];
 
@@ -131,7 +140,7 @@ export function EventShell({ eventId, page, sub }) {
                 <${Icon} name=${item.icon} size=${18} />
                 <span>${item.label}</span>
                 ${item.id === 'lecture'
-                  ? counts.lecture > 0 && html`<span class="nav-count warn" title="Puces à traiter">${counts.lecture}</span>`
+                  ? html`${counts.lecture > 0 && html`<span class="nav-count warn" title="Puces à traiter">${counts.lecture}</span>`}<span class=${'nav-dot ' + status.kind} title=${status.label}></span>`
                   : counts[item.id] > 0 && html`<span class="nav-count">${counts[item.id]}</span>`}
               </a>`
             )}
@@ -153,7 +162,7 @@ export function EventShell({ eventId, page, sub }) {
           <span class="muted">${formatDate(s.event.date)}</span>
         </div>
         <div class="topbar-right">
-          <${StationChip} eventId=${eventId} />
+          <${StationChip} eventId=${eventId} status=${status} />
           <${Button} small icon="monitor" onClick=${() => window.open(`#/ecran/${eventId}`, `balise-ecran-${eventId}`)} title="Écran de résultats pour le public">Écran</${Button}>
         </div>
       </header>

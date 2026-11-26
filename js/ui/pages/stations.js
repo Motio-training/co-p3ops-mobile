@@ -4,7 +4,9 @@ import { confirmDialog, toast } from '../../core/bus.js';
 import { station, humanError } from '../../sportident/station.js';
 import { CONFIG_MODES, MODE_READOUT } from '../../sportident/constants.js';
 import { Badge, Button, Card, Field, Icon, PageHeader, Segmented, EmptyState } from '../components.js';
-import { useStation } from '../hooks.js';
+import { useSettings, useStation } from '../hooks.js';
+import { addBalises, noteBaliseChecked, removeBalise } from '../../core/settings.js';
+import { parseCodeList } from './control-picker.js';
 import { StationPanel } from './readout.js';
 
 const LOG_KEY = 'balise.boitiers';
@@ -69,6 +71,72 @@ function InfoGrid({ info }) {
   </dl>`;
 }
 
+/** Balises connues de l'application : elles servent au choix des balises des circuits. */
+function KnownBalises({ onPick }) {
+  const st = useSettings();
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState('');
+  const add = async () => {
+    const { codes, bad } = parseCodeList(text);
+    if (bad.length) return toast(`Numéros non compris : ${bad.join(', ')} (de 1 à 1023).`, 'warning');
+    if (!codes.length) return;
+    try {
+      await addBalises(codes);
+      setText('');
+      toast(`${codes.length} balise${codes.length > 1 ? 's' : ''} ajoutée${codes.length > 1 ? 's' : ''}.`, 'success');
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
+  const del = async (code) => {
+    const ok = await confirmDialog({
+      title: 'Retirer la balise',
+      message: `Retirer la balise ${code} de la liste ? Les circuits qui l'utilisent la gardent.`,
+      confirmLabel: 'Retirer',
+      danger: true,
+    });
+    if (ok) removeBalise(code).catch((e) => toast(e.message, 'error'));
+  };
+  const detail = (b) =>
+    [
+      `Balise ${b.code}`,
+      b.serial && `boîtier n° ${b.serial}`,
+      b.battery != null && `batterie ${b.battery} %`,
+      b.drift != null && `horloge : ${fmtDrift(b.drift)}`,
+      b.checkedAt && `contrôlée le ${new Date(b.checkedAt).toLocaleDateString('fr-FR')}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  const level = (b) => (b.battery == null ? 'unknown' : b.battery < 20 ? 'err' : b.battery < 40 ? 'warn' : 'ok');
+  return html`<${Card}
+    title=${`Balises connues (${st.balises.length})`}
+    class="mt"
+    actions=${html`<${Button} small icon=${editing ? 'check' : 'edit'} onClick=${() => setEditing(!editing)}>${editing ? 'Terminer' : 'Modifier la liste'}</${Button}>`}
+  >
+    <p class="muted small">
+      ${editing
+        ? 'Ajoutez des numéros (ex. : 51 ou 51-55) ou retirez une balise avec ×.'
+        : 'Touchez une balise pour la programmer. Ce sont les balises proposées dans les circuits ; chaque boîtier « poste » lu ou programmé est ajouté ici avec sa batterie.'}
+    </p>
+    ${st.balises.length
+      ? html`<div class="picker-grid balise-grid">
+          ${st.balises.map(
+            (b) => html`<span key=${b.code} class=${'balise-chip level-' + level(b)} title=${detail(b)}>
+              <button type="button" class="balise-num" onClick=${() => !editing && onPick(b.code)} disabled=${editing}>${b.code}</button>
+              ${editing && html`<button type="button" class="balise-del" title=${`Retirer la balise ${b.code}`} onClick=${() => del(b.code)}>×</button>`}
+            </span>`
+          )}
+        </div>`
+      : html`<p class="muted small">Aucune balise pour l'instant.</p>`}
+    ${editing &&
+    html`<div class="picker-add mt">
+      <input class="input input-sm mono" value=${text} placeholder="51 ou 51-55" onInput=${(e) => setText(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && add()} />
+      <${Button} small icon="plus" onClick=${add} disabled=${!text.trim()}>Ajouter</${Button}>
+    </div>`}
+    <p class="muted small mt">Pastille de couleur : batterie du dernier contrôle (vert, orange, rouge ; gris si jamais contrôlée).</p>
+  <//>`;
+}
+
 export function StationsPage() {
   const st = useStation();
   const [remote, setRemote] = useState(true);
@@ -122,6 +190,7 @@ export function StationsPage() {
       if (CONFIG_MODES.some((m) => m.value === i.mode)) setMode(i.mode);
       setCodeText(String(i.code));
       record(i, 'Contrôle');
+      noteBaliseChecked({ ...i, drift: driftOf(i) }).catch(() => {});
     });
 
   const program = () =>
@@ -140,6 +209,7 @@ export function StationsPage() {
       setInfo(after);
       setDone(after);
       record(after, 'Programmé');
+      noteBaliseChecked({ ...after, drift: driftOf(after) }).catch(() => {});
       toast(`Boîtier n° ${after.serial} programmé : ${modeLabel(after.mode)} ${after.code}${syncTime ? ', heure réglée' : ''}.`, 'success');
       if (mode === 0x02) setCodeText(String(Math.min(1023, code + 1)));
     });
@@ -197,6 +267,15 @@ export function StationsPage() {
         <p class="muted small mt">CO - P3OPS écrit la fonction et le numéro, règle l'heure, puis relit le boîtier pour vérifier.</p>
       <//>
     </div>
+
+    <${KnownBalises}
+      onPick=${(code) => {
+        setMode(0x02);
+        setCodeText(String(code));
+        setRemote(true);
+        toast(`Balise ${code} choisie : posez le boîtier sur le lecteur, puis « Programmer le boîtier ».`, 'info');
+      }}
+    />
 
     <${Card}
       title=${`Boîtiers contrôlés (${log.length})`}

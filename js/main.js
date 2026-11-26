@@ -18,6 +18,7 @@ function App() {
   if (route[0] === 'ecran' && route[1]) content = html`<${DisplayPage} eventId=${route[1]} />`;
   else if (route[0] === 'boitiers') content = html`<div class="page standalone"><${StationsPage} /></div>`;
   else if (route[0] === 'reglages') content = html`<div class="page standalone"><${SettingsPage} tab=${route[1]} /></div>`;
+  else if (route[0] === 'circuits' || route[0] === 'baremes') content = html`<div class="page standalone"><${SettingsPage} tab=${route[0]} /></div>`;
   else if (route[0] === 'e' && route[1]) content = html`<${EventShell} eventId=${route[1]} page=${route[2]} sub=${route[3]} />`;
   else content = html`<${HomePage} />`;
   return html`${content}<${ToastHost} /><${DialogHost} />`;
