@@ -119,7 +119,8 @@ export function EventShell({ eventId, page, sub }) {
   const counts = {
     circuits: s.courses.size,
     categories: s.classes.size,
-    coureurs: s.competitors.size,
+    // Personnes réellement inscrites (nom, prénom) : les puces vacantes du fichier d'inscription ne comptent pas
+    coureurs: [...s.competitors.values()].filter((c) => c.lastName || c.firstName).length,
     lecture: d.unassigned.length,
   };
   const score = isScoreMode(s.event);

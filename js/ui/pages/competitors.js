@@ -353,6 +353,12 @@ export function CompetitorsPage() {
       return (a.importLine ?? 1e9) - (b.importLine ?? 1e9) || (a.card || 0) - (b.card || 0);
     });
   const namedCount = list.filter(hasName).length;
+  // En-tête : personnes réellement inscrites ; les puces vacantes restent disponibles pour une inscription tardive
+  const allComps = [...s.competitors.values()];
+  const totalNamed = allComps.filter(hasName).length;
+  const totalFree = allComps.length - totalNamed;
+  const word1 = score ? ['personnel inscrit', 'personnels inscrits'] : ['inscrit', 'inscrits'];
+  const subtitle = `${totalNamed} ${totalNamed > 1 ? word1[1] : word1[0]}${totalFree ? ` · ${totalFree} puce${totalFree > 1 ? 's' : ''} sans nom disponible${totalFree > 1 ? 's' : ''}` : ''}`;
 
   const importFile = async () => {
     const src = await chooseEntriesFile();
@@ -360,7 +366,7 @@ export function CompetitorsPage() {
   };
 
   return html`
-    <${PageHeader} title=${score ? 'Personnels' : 'Coureurs'} subtitle=${`${s.competitors.size} inscrit${s.competitors.size > 1 ? 's' : ''}`}>
+    <${PageHeader} title=${score ? 'Personnels' : 'Coureurs'} subtitle=${subtitle}>
       <${Menu}
         label="Importer / exporter"
         items=${[
@@ -388,7 +394,7 @@ export function CompetitorsPage() {
                     ${classes.map((c) => html`<option value=${c.id}>${c.name}</option>`)}
                     ${d.noClass.length > 0 && html`<option value="__none">Sans catégorie (${d.noClass.length})</option>`}`}
             </select>
-            <span class="muted small">${list.length} affiché${list.length > 1 ? 's' : ''}</span>
+            <span class="muted small">${namedCount} ${score ? 'personnel' : 'inscrit'}${namedCount > 1 ? 's' : ''} affiché${namedCount > 1 ? 's' : ''}${list.length > namedCount ? ` · ${list.length - namedCount} puce${list.length - namedCount > 1 ? 's' : ''} sans nom` : ''}</span>
           </div>
           <div class="table-wrap"><table class="table">
             <thead><tr><th>Nom</th>${score ? html`<th>Section</th><th class="num">1re balise</th>` : html`<th>Club</th><th>Catégorie</th>`}<th class="num">Puce</th><th class="num">Départ</th><th>Résultat</th></tr></thead>
