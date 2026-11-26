@@ -10,7 +10,7 @@
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-height: 520px) {
   body {
     font-size: 15px;
     -webkit-tap-highlight-color: transparent;
@@ -454,5 +454,115 @@
   .toast-host,
   .toasts {
     bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- Téléphone tenu à l'horizontale : peu de hauteur, tout doit rester accessible en faisant défiler ---------- */
+@media (max-height: 520px) and (orientation: landscape) {
+  /* Menu du bas plus bas (icônes seules) pour laisser de la place au contenu */
+  .app-shell {
+    padding-bottom: calc(46px + env(safe-area-inset-bottom));
+  }
+
+  .nav-item {
+    min-width: 54px;
+    padding: 6px 4px;
+  }
+
+  .nav-item > span:not(.nav-count):not(.nav-dot) {
+    display: none;
+  }
+
+  .sidebar {
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
+
+  /* La barre du haut défile avec la page */
+  .topbar {
+    position: static;
+    min-height: 42px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .page {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .wz-foot {
+    bottom: calc(46px + env(safe-area-inset-bottom));
+    padding: 6px 16px;
+  }
+
+  .wz-hint {
+    display: none;
+  }
+
+  .btn-next {
+    height: 40px;
+  }
+
+  .wz-head {
+    padding-top: 12px;
+  }
+
+  .wz-head h1 {
+    font-size: 20px;
+  }
+
+  html {
+    scroll-padding-bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+
+  /* Fenêtres : en-tête et boutons compacts, boutons sur une seule ligne */
+  .modal-head {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .modal-foot {
+    flex-wrap: nowrap;
+    padding: 6px max(12px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  .modal-foot .btn,
+  .modal-foot .btn-primary {
+    flex: 1 1 0;
+    min-height: 40px;
+    order: 0;
+  }
+
+  .modal-foot > span:not(.spacer) {
+    display: none;
+  }
+
+  /* Accueil : tuiles sur deux colonnes */
+  .home-main,
+  .home-more {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Écran d'affichage : il défile au lieu d'être coupé */
+  .display {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .score-display .podium {
+    height: 220px !important;
+  }
+
+  .rank-list {
+    flex: none;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .last-read {
+    flex-wrap: wrap;
+    gap: 10px 18px;
   }
 }

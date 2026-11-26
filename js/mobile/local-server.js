@@ -143,9 +143,43 @@ async function listCourses() {
   return out.sort((a, b) => (b.eventDate || '').localeCompare(a.eventDate || '') || b.updated - a.updated);
 }
 
+// Réglages du PC livrés avec l'application (circuits, barèmes, balises connues) : ajoutés une seule fois
+// au téléphone, sans écraser ce qui y a été créé ; un élément supprimé sur le téléphone ne revient pas.
+let initialPromise = null;
+function initialSettings() {
+  if (!initialPromise) {
+    initialPromise = realFetch(new URL('reglages-initiaux.json', APP_BASE).href)
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => ({}));
+  }
+  return initialPromise;
+}
+
 async function getSettings() {
   const all = await tx('settings', 'readonly', (st) => req(st.getAll()));
-  return Object.fromEntries(all.map((r) => [r.key, r.data]));
+  const stored = Object.fromEntries(all.map((r) => [r.key, r.data]));
+  const init = await initialSettings();
+  const seen = stored._initial || { circuits: [], baremes: [], balises: [] };
+  const changed = new Set();
+  for (const key of ['circuits', 'baremes', 'balises']) {
+    const idOf = key === 'balises' ? (x) => x.code : (x) => x.id;
+    for (const item of init[key] || []) {
+      const id = idOf(item);
+      if (id == null || (seen[key] || []).includes(id)) continue;
+      seen[key] = [...(seen[key] || []), id];
+      const list = Array.isArray(stored[key]) ? stored[key] : [];
+      if (!list.some((x) => idOf(x) === id)) stored[key] = [...list, item];
+      else stored[key] = list;
+      changed.add(key);
+    }
+  }
+  if (changed.size) {
+    if (stored.balises) stored.balises = [...stored.balises].sort((a, b) => a.code - b.code);
+    for (const key of changed) await putSetting(key, stored[key]);
+    await putSetting('_initial', seen);
+  }
+  delete stored._initial;
+  return stored;
 }
 
 async function putSetting(key, value) {

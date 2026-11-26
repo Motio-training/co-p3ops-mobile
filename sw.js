@@ -1,7 +1,7 @@
 // CO - P3OPS Mobile : fonctionnement hors connexion. Tous les fichiers de l'application sont gardés
 // dans le téléphone à la première ouverture ; ensuite l'appli s'ouvre même sans réseau.
 // (Fichier généré par mobile/construire-mobile.py : la liste et la version sont remplies à la construction.)
-const VERSION = "co-p3ops-mobile-20261126-1507cbea7b";
+const VERSION = "co-p3ops-mobile-20261126-5439281fc6";
 const FILES = [
  "./",
  "css/mobile.css",
@@ -65,6 +65,7 @@ const FILES = [
  "js/ui/pages/stations.js",
  "js/ui/quit.js",
  "manifest.webmanifest",
+ "reglages-initiaux.json",
  "vendor/preact-htm.js"
 ];
 
