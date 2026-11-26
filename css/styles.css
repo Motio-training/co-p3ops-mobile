@@ -3760,21 +3760,23 @@ button.nav-item {
   opacity: 0.85;
 }
 
-.podium-note {
-  font-size: 46px;
+/* Sur le podium, le temps est mis en avant (les premiers ont souvent tous 20/20) */
+.podium-time {
+  font-size: 44px;
   font-weight: 800;
   line-height: 1;
 }
 
-.podium-note small {
-  font-size: 20px;
-  opacity: 0.8;
-  margin-left: 2px;
+.podium-note {
+  font-size: 18px;
+  font-weight: 700;
+  opacity: 0.9;
 }
 
-.podium-time {
-  font-size: 17px;
-  opacity: 0.9;
+.podium-note small {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-left: 1px;
 }
 
 .rank-list {

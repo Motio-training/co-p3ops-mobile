@@ -82,8 +82,8 @@ function PodiumStep({ row, rank }) {
     </div>
     <div class="podium-block">
       <span class="podium-place">${row.place}</span>
-      <span class="podium-note">${row.res.note}<small>/20</small></span>
       <span class="podium-time mono">${fmtDuration(row.res.time)}</span>
+      <span class="podium-note">${row.res.note}<small>/20</small></span>
     </div>
   </div>`;
 }
