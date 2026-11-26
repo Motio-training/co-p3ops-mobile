@@ -54,9 +54,11 @@ export function handleCard(card, source = 'station') {
     competitorId: null,
   };
 
-  // Relecture d'une puce identique : rien ne change.
+  // Relecture d'une puce identique : le résultat ne change pas. On note l'heure de la relecture
+  // pour que l'écran d'affichage montre à nouveau ce coureur dans son bandeau.
   const same = [...store.cards.values()].find((r) => r.number === read.number && sameCardData(r, read));
   if (same) {
+    put('card', { ...same, rereadAt: read.readAt });
     readout.lastId = same.id;
     bus.emit('readout', { id: same.id, duplicate: true });
     toast(`Puce ${read.number} déjà lue — résultat inchangé.`, 'info');

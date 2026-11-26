@@ -67,52 +67,97 @@ export function DisplayPage({ eventId }) {
 }
 
 // --- Course au score ---------------------------------------------------------------------------------
-function chunk(list, n) {
-  const out = [];
-  for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
-  return out;
-}
+// Podium fixe en haut, liste des autres arrivés qui défile, et en bas le bandeau du coureur affiché :
+// le dernier qui a passé (ou repassé) sa puce, ou celui sur lequel on a cliqué. Les flèches du bandeau
+// permettent de revenir aux coureurs précédents, puis de revenir vers le plus récent.
 
-function PodiumStep({ row, rank }) {
-  if (!row) return html`<div class=${'podium-step empty p' + rank}><div class="podium-block"><span class="podium-place">${rank}</span></div></div>`;
-  return html`<div class=${'podium-step p' + rank}>
+const Chevron = ({ dir }) =>
+  html`<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d=${dir === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} /></svg>`;
+
+function PodiumStep({ row, rank, selected, onPick }) {
+  if (!row) {
+    return html`<div class=${'podium-step empty p' + rank}>
+      <div class="podium-person"><span class="podium-rank">${rank}</span></div>
+      <div class="podium-block"></div>
+    </div>`;
+  }
+  return html`<button type="button" class=${'podium-step p' + rank + (selected ? ' selected' : '')} onClick=${() => onPick(row.comp.id)} title="Afficher dans le bandeau">
     <div class="podium-person">
+      <span class="podium-rank">${row.place}</span>
       <strong>${personName(row.comp)}</strong>
       <span>${sectionOf(row.comp)}</span>
     </div>
     <div class="podium-block">
-      <span class="podium-place">${row.place}</span>
       <span class="podium-time mono">${fmtDuration(row.res.time)}</span>
       <span class="podium-note">${row.res.note}<small>/20</small></span>
     </div>
-  </div>`;
+  </button>`;
 }
 
-/** Bandeau du bas : la dernière puce passée dans le lecteur. */
-function LastRead() {
+/** Coureur concerné par une lecture : celui de la lecture, sinon le seul inscrit avec ce numéro de puce. */
+function compForRead(s, read) {
+  if (!read) return null;
+  if (read.competitorId && s.competitors.has(read.competitorId)) return read.competitorId;
+  const owners = [...s.competitors.values()].filter((c) => Number(c.card) === Number(read.number));
+  return owners.length === 1 ? owners[0].id : null;
+}
+
+/**
+ * Historique du bandeau, du plus ancien au plus récent : chaque lecture de puce (et la dernière
+ * relecture), plus les coureurs choisis d'un clic sur l'écran.
+ */
+function bannerHistory(s, picks) {
+  const items = [];
+  for (const r of s.cards.values()) {
+    if (r.archived) continue;
+    items.push({ key: 'r' + r.id, t: r.readAt, readId: r.id, kind: 'read' });
+    if (r.rereadAt) items.push({ key: 'rr' + r.id + r.rereadAt, t: r.rereadAt, readId: r.id, kind: 'reread' });
+  }
+  for (const p of picks) items.push({ key: p.key, t: p.t, compId: p.compId, kind: 'pick' });
+  return items.sort((a, b) => a.t - b.t);
+}
+
+/** Bandeau du bas : le coureur affiché, avec flèches précédent / suivant. */
+function Banner({ item, index, count, onPrev, onNext }) {
   const s = useStore();
   const d = getDerived();
-  const latest = [...s.cards.values()].sort((a, b) => b.readAt - a.readAt)[0];
-  if (!latest) {
-    return html`<footer class="last-read idle"><div class="last-who"><span class="last-label">Dernière puce lue</span><span>En attente de la première arrivée…</span></div></footer>`;
-  }
-  const comp = latest.competitorId ? s.competitors.get(latest.competitorId) : null;
-  const res = comp && d.readsByComp.get(comp.id)?.id === latest.id ? d.results.get(comp.id) : null;
-  const at = new Date(latest.readAt).toLocaleTimeString('fr-FR').slice(0, 5);
+  const frame = (content, cls = '') => html`<footer class=${'last-read' + cls} key=${item ? item.key : 'idle'}>
+    <button type="button" class="last-nav" onClick=${onPrev} disabled=${!count || index <= 0} title="Coureur précédent"><${Chevron} dir="left" /></button>
+    ${content}
+    <button type="button" class="last-nav" onClick=${onNext} disabled=${!count || index >= count - 1} title="Coureur suivant"><${Chevron} dir="right" /></button>
+    ${count > 1 && html`<span class="last-pos">${index + 1} / ${count}</span>`}
+  </footer>`;
+
+  if (!item) return frame(html`<div class="last-who"><span class="last-label">Dernière puce lue</span><span>En attente de la première arrivée…</span></div>`, ' idle');
+
+  const read = item.readId ? s.cards.get(item.readId) : null;
+  const compId = item.compId || compForRead(s, read);
+  const comp = compId ? s.competitors.get(compId) : null;
+  const active = comp ? d.readsByComp.get(comp.id) : null;
+  const res = active ? d.results.get(comp.id) : null;
+  const clock = (t) => new Date(t).toLocaleTimeString('fr-FR').slice(0, 5);
+  const label =
+    item.kind === 'pick'
+      ? `Coureur sélectionné${active ? ` · puce lue à ${clock(active.rereadAt || active.readAt)}` : ''}`
+      : item.kind === 'reread'
+        ? `Puce relue · ${clock(item.t)}`
+        : `Puce lue · ${clock(item.t)}`;
+
   if (!res) {
-    return html`<footer class="last-read unknown" key=${latest.id}>
-      <div class="last-who"><span class="last-label">Dernière puce lue · ${at}</span><strong>Puce ${latest.number}</strong><span>À traiter à la table de lecture</span></div>
-    </footer>`;
+    return frame(
+      html`<div class="last-who"><span class="last-label">${label}</span><strong>Puce ${read?.number ?? '—'}</strong><span>À traiter à la table de lecture</span></div>`,
+      ' unknown'
+    );
   }
   const ok = res.status === 'OK' && res.note != null;
   // 1re balise : celle poinçonnée en premier par le coureur, en vert si c'est la balise imposée, en rouge sinon
   const first = res.first || {};
   const firstClass = first.ok === true ? 'last-good' : first.ok === false ? 'last-bad' : '';
-  return html`<footer class="last-read" key=${latest.id}>
+  return frame(html`
     <div class="last-who">
-      <span class="last-label">Dernière puce lue · ${at}</span>
+      <span class="last-label">${label}</span>
       <strong>${personName(comp)}</strong>
-      <span>${sectionOf(comp)} · Puce <span class="mono">${latest.number}</span></span>
+      <span>${sectionOf(comp)} · Puce <span class="mono">${active.number}</span></span>
     </div>
     <div class="last-fact"><span>Balises validées</span><b>${res.validated ?? 0} / ${res.totalControls}</b></div>
     <div class="last-fact wide">
@@ -126,14 +171,28 @@ function LastRead() {
     </div>
     <div class="last-fact"><span>Temps</span><b class="mono">${res.time != null ? fmtDuration(res.time) : '—'}</b></div>
     <div class=${'last-note' + (ok ? '' : ' bad')}>${ok ? html`${res.note}<small>/20</small>` : html`<span class="last-status">${STATUS_LABEL[res.status]}</span>`}</div>
-  </footer>`;
+  `);
 }
 
 function ScoreDisplay() {
+  const s = useStore();
   const d = getDerived();
   const { w, h } = useSize();
   const chrome = useChrome();
-  const [page, pagesRef] = useRotation();
+  const [picks, setPicks] = useState([]); // coureurs choisis d'un clic
+  const [pos, setPos] = useState(null); // position dans l'historique du bandeau (null : le plus récent)
+
+  const history = bannerHistory(s, picks);
+  const lastKey = history.length ? history[history.length - 1].key : '';
+  // Une nouvelle lecture (ou un clic) ramène le bandeau sur le plus récent.
+  useEffect(() => setPos(null), [lastKey]);
+  const index = pos == null ? history.length - 1 : Math.min(pos, history.length - 1);
+  const item = history[index] || null;
+  const shownComp = item ? item.compId || compForRead(s, item.readId ? s.cards.get(item.readId) : null) : null;
+
+  const pick = (compId) => setPicks((list) => [...list.slice(-199), { key: `p${Date.now()}-${list.length}`, t: Date.now(), compId }]);
+  const prev = () => setPos(Math.max(0, index - 1));
+  const next = () => setPos(index + 1 >= history.length - 1 ? null : index + 1);
 
   // Classement général : meilleure note, puis meilleur temps (les non-arrivés n'apparaissent pas)
   const rows = d.overall.rows.filter((r) => r.res.status !== 'RUN' && r.res.status !== 'DNS');
@@ -141,37 +200,30 @@ function ScoreDisplay() {
   const rest = rows.filter((r) => !podium.includes(r));
   const cols = w >= 1700 ? 3 : w >= 1100 ? 2 : 1;
   const rowH = h >= 1000 ? 48 : 42;
-  const podiumH = h >= 900 ? 300 : 260;
-  const perCol = Math.max(3, Math.floor((h - podiumH - 130 - 40) / (rowH + 4)));
-  const pages = chunk(rest, perCol * cols);
-  pagesRef.current = pages.length;
-  const current = pages[page % Math.max(1, pages.length)] || [];
+  const podiumH = h >= 900 ? 320 : 270;
 
   return html`<div class=${'display score-display' + (chrome ? '' : ' no-cursor')}>
     <button class=${'display-fs floating' + (chrome ? '' : ' hidden')} onClick=${toggleFs} title="Plein écran"><${Icon} name="maximize" size=${20} /></button>
     <section class="podium" style=${`height:${podiumH}px`}>
       ${rows.length
-        ? html`<${PodiumStep} row=${podium[1]} rank=${2} /><${PodiumStep} row=${podium[0]} rank=${1} /><${PodiumStep} row=${podium[2]} rank=${3} />`
+        ? [2, 1, 3].map(
+            (rank) => html`<${PodiumStep} key=${rank} row=${podium[rank - 1]} rank=${rank} selected=${!!podium[rank - 1] && podium[rank - 1].comp.id === shownComp} onPick=${pick} />`
+          )
         : html`<div class="display-empty">Le classement s'affichera ici dès les premières arrivées.</div>`}
     </section>
-    <main class="rank-list" style=${`grid-template-columns:repeat(${cols},1fr)`}>
-      ${chunk(current, perCol).map(
-        (col, ci) => html`<div class="rank-col" key=${page + '-' + ci}>
-          ${col.map(
-            (row) => html`<div class="rank-row" style=${`height:${rowH}px`} key=${row.comp.id}>
-              <span class="d-pl">${row.place ?? ''}</span>
-              <span class="d-name">${personName(row.comp)}<small>${sectionOf(row.comp)}</small></span>
-              <span class="d-sub mono">${row.res.status === 'OK' ? fmtDuration(row.res.time) : ''}</span>
-              <span class="d-time mono">${row.res.status === 'OK' && row.res.note != null
-                ? html`${row.res.note}<small class="d-unit">/20</small>`
-                : html`<span class="d-st">${STATUS_LABEL[row.res.status]}</span>`}</span>
-            </div>`
-          )}
-        </div>`
+    <main class="rank-list" style=${`grid-template-columns:repeat(${cols},minmax(0,1fr))`}>
+      ${rest.map(
+        (row) => html`<button type="button" key=${row.comp.id} class=${'rank-row' + (row.comp.id === shownComp ? ' selected' : '')} style=${`height:${rowH}px`} onClick=${() => pick(row.comp.id)}>
+          <span class="d-pl">${row.place ?? ''}</span>
+          <span class="d-name">${personName(row.comp)}<small>${sectionOf(row.comp)}</small></span>
+          <span class="d-sub mono">${row.res.status === 'OK' ? fmtDuration(row.res.time) : ''}</span>
+          <span class="d-time mono">${row.res.status === 'OK' && row.res.note != null
+            ? html`${row.res.note}<small class="d-unit">/20</small>`
+            : html`<span class="d-st">${STATUS_LABEL[row.res.status]}</span>`}</span>
+        </button>`
       )}
-      ${pages.length > 1 && html`<span class="display-pages corner">${(page % pages.length) + 1} / ${pages.length}</span>`}
     </main>
-    <${LastRead} />
+    <${Banner} item=${item} index=${index} count=${history.length} onPrev=${prev} onNext=${next} />
   </div>`;
 }
 
