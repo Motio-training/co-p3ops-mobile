@@ -174,9 +174,10 @@ class UsbSerial extends EventTarget {
   }
 }
 
-// Sur Android, on passe toujours par WebUSB (le port série USB natif n'y est pas fiable).
-// Ailleurs (PC), on garde l'API Web Serial du navigateur si elle existe.
-const isAndroid = /Android/i.test(navigator.userAgent);
-if ('usb' in navigator && (isAndroid || !('serial' in navigator))) {
+// La version téléphone passe toujours par ce pilote USB dès que le navigateur le permet : le port série
+// « natif » de Chrome sur Android ne voit pas le lecteur (« aucun appareil compatible »), et l'on ne peut
+// pas se fier au nom du système (Chrome en « version pour ordinateur » ne dit plus qu'il est sur Android).
+if ('usb' in navigator) {
+  if ('serial' in navigator) Object.defineProperty(navigator, 'serialNative', { value: navigator.serial, configurable: true });
   Object.defineProperty(navigator, 'serial', { value: new UsbSerial(), configurable: true });
 }

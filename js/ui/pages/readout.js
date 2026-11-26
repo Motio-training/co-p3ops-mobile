@@ -24,6 +24,12 @@ async function connectReal(anyPort = false) {
     toast('Boîtier connecté : insérez une puce.', 'success');
   } catch (e) {
     if (e?.name !== 'NotFoundError') toast(humanError(e), 'error');
+    else
+      toast(
+        "Lecteur absent de la liste ? Débranchez-le puis rebranchez-le, et vérifiez le câble (sur téléphone : l'adaptateur OTG). Certains téléphones coupent l'« OTG » après quelques minutes : réactivez-le dans leurs réglages.",
+        'info',
+        { duration: 12000 }
+      );
   }
 }
 

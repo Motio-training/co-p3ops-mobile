@@ -222,7 +222,7 @@ export function ToastHost() {
       bus.on('toast', (t) => {
         const id = Math.random();
         setToasts((list) => [...list.slice(-4), { ...t, id }]);
-        setTimeout(() => setToasts((list) => list.filter((x) => x.id !== id)), t.kind === 'error' ? 8000 : 4500);
+        setTimeout(() => setToasts((list) => list.filter((x) => x.id !== id)), t.duration || (t.kind === 'error' ? 8000 : 4500));
       }),
     []
   );
