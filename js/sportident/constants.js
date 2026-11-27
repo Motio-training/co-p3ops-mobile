@@ -25,8 +25,11 @@ export const MS_REMOTE = 0x53; // « S » : les commandes passent au boîtier po
 // Fonctions programmables d'un boîtier (adresse système 0x71)
 export const CONFIG_MODES = [
   { value: 0x02, label: 'Poste de contrôle' },
+  { value: 0x32, label: 'Poste de contrôle sans contact (SIAC)' },
   { value: 0x03, label: 'Départ' },
+  { value: 0x33, label: 'Départ sans contact (SIAC)' },
   { value: 0x04, label: 'Arrivée' },
+  { value: 0x34, label: 'Arrivée sans contact (SIAC)' },
   { value: 0x07, label: 'Effacement' },
   { value: 0x0a, label: 'Vérification' },
   { value: 0x05, label: 'Lecture (mini reader)' },
@@ -44,8 +47,14 @@ export const MODE_NAMES = {
   0x0b: 'Impression',
   0x0c: 'Départ (déclencheur)',
   0x0d: 'Arrivée (déclencheur)',
-  0x12: 'Balise (beacon)',
+  0x12: 'Contrôle (BC)',
+  0x32: 'Contrôle sans contact',
+  0x33: 'Départ sans contact',
+  0x34: 'Arrivée sans contact',
 };
+
+/** Fonctions « poste de contrôle » (avec ou sans contact) : le numéro est celui d'une balise du circuit. */
+export const isControlMode = (mode) => mode === 0x02 || mode === 0x32 || mode === 0x12;
 
 export const MODE_READOUT = 0x05;
 

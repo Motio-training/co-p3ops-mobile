@@ -43,7 +43,7 @@ export class SimulatedPort {
     this.master = { sys: makeSys({ serial, modelId, mode: 0x05, code }), clockOffset: 0 };
     // Poste BSF8 posé sur le lecteur : batterie de 1000 mAh dont 22 % consommés, horloge en retard de 13 min
     this.remote = {
-      sys: makeSys({ serial: 813456, modelId: 0x8198, mode: 0x02, code: 44, battery: { capRaw: 71, usedRaw: 790000 } }),
+      sys: makeSys({ serial: 813456, modelId: 0x8198, mode: 0x02, code: 44, battery: { capRaw: 14062, usedRaw: 790000 } }),
       clockOffset: -13 * 60 * 1000,
     };
     this.remotePresent = true;

@@ -17,10 +17,11 @@ export function parseSystemData(v) {
   const mode = v[0x71];
   const code = v[0x72] | (((v[0x73] >> 6) & 3) << 8);
 
-  // Batterie : capacité (0x19-0x1A, unité 14,0625 mAh) et consommation (0x35-0x37, en mA·s)
+  // Batterie : capacité (0x19-0x1A, en 1/14,0625 mAh : 0x36EE = 1000 mAh) et consommation (0x35-0x37, en mA·s).
+  // Vérifié sur un vrai BSF8 (pile 1000 mAh) le 26/11/2026.
   const capRaw = (v[0x19] << 8) | v[0x1a];
   const usedRaw = (v[0x35] << 16) | (v[0x36] << 8) | v[0x37];
-  const capacityMah = capRaw && capRaw !== 0xffff ? Math.round(capRaw * 14.0625) : null;
+  const capacityMah = capRaw && capRaw !== 0xffff ? Math.round(capRaw / 14.0625) : null;
   const usedMah = usedRaw !== 0xffffff ? Math.round(usedRaw / 3600) : null;
   let batteryPercent = null;
   if (capacityMah && capacityMah >= 100 && capacityMah <= 20000 && usedMah != null) {

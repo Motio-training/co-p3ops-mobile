@@ -4688,3 +4688,12 @@ button.rank-row {
     font-size: 16px; /* évite le zoom automatique du téléphone */
   }
 }
+
+/* Programmation des boîtiers : heure en direct */
+.mt-sm {
+  margin-top: 6px;
+}
+.clock-big {
+  font-size: 17px;
+  font-weight: 600;
+}

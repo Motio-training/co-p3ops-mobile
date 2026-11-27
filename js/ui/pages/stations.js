@@ -1,8 +1,8 @@
 // Programmation des boîtiers SportIdent : fonction, n° de poste, heure, batterie.
-import { html, useState } from '../../lib.js';
+import { html, useEffect, useState } from '../../lib.js';
 import { confirmDialog, toast } from '../../core/bus.js';
 import { station, humanError } from '../../sportident/station.js';
-import { CONFIG_MODES, MODE_READOUT } from '../../sportident/constants.js';
+import { CONFIG_MODES, MODE_NAMES, MODE_READOUT, isControlMode } from '../../sportident/constants.js';
 import { Badge, Button, Card, Field, Icon, PageHeader, Segmented, EmptyState } from '../components.js';
 import { useSettings, useStation } from '../hooks.js';
 import { addBalises, noteBaliseChecked, removeBalise } from '../../core/settings.js';
@@ -40,7 +40,23 @@ function fmtDrift(s) {
 }
 
 function modeLabel(mode) {
-  return CONFIG_MODES.find((m) => m.value === mode)?.label || `mode ${mode}`;
+  return CONFIG_MODES.find((m) => m.value === mode)?.label || MODE_NAMES[mode] || `mode ${mode}`;
+}
+
+const settingLabel = (mode, code) => `${modeLabel(mode)} n° ${code}`;
+
+/** Heure du boîtier, qui avance en direct (d'après l'écart mesuré à la lecture). */
+function LiveClock({ info }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const drift = driftOf(info);
+  if (drift == null) return html`<span class="muted">illisible</span>`;
+  const now = new Date(Date.now() + drift * 1000);
+  return html`<span class="mono clock-big">${now.toLocaleTimeString('fr-FR')}</span>
+    <span class=${Math.abs(drift) > 2 ? 'text-warn' : 'text-ok'}> ${fmtDrift(drift)}</span>`;
 }
 
 function BatteryGauge({ percent }) {
@@ -52,20 +68,24 @@ function BatteryGauge({ percent }) {
   </span>`;
 }
 
-function InfoGrid({ info }) {
+function InfoGrid({ info, onSyncClock, busy }) {
   const drift = driftOf(info);
+  const late = drift == null || Math.abs(drift) > 2;
   return html`<dl class="facts station-facts">
     <dt>Boîtier</dt><dd><strong>${info.model}</strong> n° ${info.serial} <span class="muted small">· firmware ${info.firmware}</span></dd>
-    <dt>Fonction</dt><dd><strong>${modeLabel(info.mode)}</strong>${info.mode === 0x02 || info.code ? html` · n° <strong>${info.code}</strong>` : ''}</dd>
+    <dt>Fonction</dt><dd><strong>${modeLabel(info.mode)}</strong> · n° <strong>${info.code}</strong></dd>
     <dt>Batterie</dt>
     <dd>
       <${BatteryGauge} percent=${info.batteryPercent} />
       ${info.capacityMah && html`<span class="muted small"> · ${info.usedMah} mAh consommés sur ${info.capacityMah} mAh</span>`}
+      ${info.batteryPercent != null && info.batteryPercent < 20 && html`<br /><span class="text-err small"><b>Pile à changer</b> avant la prochaine course.</span>`}
       ${info.batteryDate && html`<br /><span class="muted small">Pile changée le ${info.batteryDate}</span>`}
     </dd>
-    <dt>Horloge</dt>
+    <dt>Heure</dt>
     <dd>
-      ${info.clock ? html`<span class="mono">${info.clock.toLocaleTimeString('fr-FR')}</span> <span class=${Math.abs(drift) > 2 ? 'text-warn' : 'text-ok'}>(${fmtDrift(drift)})</span>` : html`<span class="muted">illisible</span>`}
+      <${LiveClock} info=${info} />
+      ${onSyncClock &&
+      html`<div class="mt-sm"><${Button} small variant=${late ? 'primary' : 'secondary'} icon="clock" onClick=${onSyncClock} disabled=${busy}>${late ? "Mettre à l'heure" : "Resynchroniser l'heure"}</${Button}></div>`}
     </dd>
     ${info.memoryOverflow && html`<dt>Mémoire</dt><dd class="text-warn">mémoire de sauvegarde pleine</dd>`}
   </dl>`;
@@ -145,7 +165,8 @@ export function StationsPage() {
   const [mode, setMode] = useState(0x02);
   const [codeText, setCodeText] = useState('31');
   const [syncTime, setSyncTime] = useState(true);
-  const [done, setDone] = useState(null);
+  const [done, setDone] = useState(null); // dernier boîtier programmé (relu)
+  const [confirmed, setConfirmed] = useState(null); // résumé « avant → après » de la dernière programmation
   const [log, setLog] = useState(loadLog());
 
   const record = (i, action) => {
@@ -187,10 +208,24 @@ export function StationsPage() {
       if (remote && i.serial === station.info?.serial) throw new Error("c'est le lecteur lui-même qui a répondu");
       setInfo(i);
       setDone(null);
+      setConfirmed(null);
       if (CONFIG_MODES.some((m) => m.value === i.mode)) setMode(i.mode);
       setCodeText(String(i.code));
       record(i, 'Contrôle');
       noteBaliseChecked({ ...i, drift: driftOf(i) }).catch(() => {});
+    });
+
+  // Mise à l'heure seule (sans toucher à la fonction ni au numéro)
+  const syncClock = () =>
+    run(async () => {
+      const target = info || done;
+      const c = await station.syncClock(remote);
+      const next = { ...target, ...c };
+      if (info) setInfo(next);
+      else setDone(next);
+      record(next, "Mis à l'heure");
+      noteBaliseChecked({ ...next, drift: driftOf(next) }).catch(() => {});
+      toast(`Boîtier n° ${next.serial} mis à l'heure (${fmtDrift(driftOf(next))}).`, 'success');
     });
 
   const program = () =>
@@ -205,17 +240,22 @@ export function StationsPage() {
         });
         if (!ok) return;
       }
-      const { after } = await station.program(remote, { mode, code, syncTime });
-      setInfo(after);
+      const { before, after } = await station.program(remote, { mode, code, syncTime, expectSerial: info?.serial || null });
+      setConfirmed({ from: info ? settingLabel(before.mode, before.code) : null, to: settingLabel(after.mode, after.code), serial: after.serial, synced: syncTime });
+      setInfo(null);
       setDone(after);
       record(after, 'Programmé');
       noteBaliseChecked({ ...after, drift: driftOf(after) }).catch(() => {});
       toast(`Boîtier n° ${after.serial} programmé : ${modeLabel(after.mode)} ${after.code}${syncTime ? ', heure réglée' : ''}.`, 'success');
-      if (mode === 0x02) setCodeText(String(Math.min(1023, code + 1)));
+      if (isControlMode(mode)) setCodeText(String(Math.min(1023, code + 1))); // prêt pour le boîtier suivant
     });
 
   const codeNum = Number(codeText);
   const codeValid = Number.isInteger(codeNum) && codeNum >= 1 && codeNum <= 1023;
+  const shown = info || done;
+  // Boîtier lu : les réglages proposés partent de ses réglages actuels ; « Valider » n'écrit que s'ils changent.
+  const changed = !!info && codeValid && (mode !== info.mode || codeNum !== info.code);
+  const contactless = (m) => m >= 0x32 && m <= 0x34;
 
   return html`
     <${PageHeader} title="Programmer les boîtiers" subtitle="Fonction, numéro de poste, heure et batterie des boîtiers SportIdent.">
@@ -241,36 +281,55 @@ export function StationsPage() {
           ? html`<ol class="howto mt">
               <li><b>Réveillez</b> le boîtier en y insérant une puce (il bipe).</li>
               <li><b>Posez-le contre le lecteur</b> USB, zones de poinçonnage l'une contre l'autre, sans bouger.</li>
-              <li>Cliquez sur <b>Lire le boîtier</b>, choisissez sa fonction puis <b>Programmer</b>.</li>
+              <li>Cliquez sur <b>Lire le boîtier</b> : sa batterie et son heure s'affichent.</li>
+              <li>Au besoin, <b>mettez-le à l'heure</b>, ou changez sa fonction ou son numéro puis <b>Valider les réglages</b>.</li>
             </ol>`
           : html`<p class="muted small mt">Le lecteur USB doit rester en fonction « Lecture » pour lire les doigts.</p>`}
         <div class="row-actions">
           <${Button} icon="search" onClick=${read} disabled=${!st.connected || busy}>${busy ? 'Communication…' : 'Lire le boîtier'}</${Button}>
         </div>
-        ${info && html`<div class="mt"><${InfoGrid} info=${info} /></div>`}
-        ${done && html`<div class="alert alert-ok mt"><${Icon} name="check" /> <span>Programmé et vérifié : <b>${modeLabel(done.mode)} ${done.code}</b>${syncTime ? ', heure réglée' : ''}. Vous pouvez poser le boîtier suivant.</span></div>`}
+        ${confirmed &&
+        html`<div class="alert alert-ok mt"><${Icon} name="check" /> <span>
+          Boîtier n° ${confirmed.serial}${confirmed.from && confirmed.from !== confirmed.to ? html` : <s>${confirmed.from}</s> → ` : ' : '}<b>${confirmed.to}</b>, vérifié par relecture${confirmed.synced ? ', heure réglée' : ''}.
+          Vous pouvez poser le boîtier suivant.
+        </span></div>`}
+        ${shown &&
+        html`<div class="mt">
+          ${!info && html`<p class="muted small">Dernier boîtier programmé :</p>`}
+          <${InfoGrid} info=${shown} onSyncClock=${syncClock} busy=${busy} />
+        </div>`}
       <//>
 
-      <${Card} title="Nouvelle programmation">
+      <${Card} title=${info ? 'Réglages du boîtier lu' : 'Nouvelle programmation'}>
+        ${info && html`<p class="muted small">Réglages actuels : <b>${settingLabel(info.mode, info.code)}</b>. Modifiez la fonction ou le numéro, puis validez.</p>`}
         <${Field} label="Fonction">
           <select class="input" value=${mode} onChange=${(e) => setMode(Number(e.target.value))}>
             ${CONFIG_MODES.map((m) => html`<option value=${m.value}>${m.label}</option>`)}
           </select>
         <//>
-        <${Field} label=${mode === 0x02 ? 'Numéro de poste' : 'Numéro du boîtier'} hint=${mode === 0x02 ? 'De 31 à 255 en général (1 à 1023 possible). Il augmente de 1 après chaque programmation.' : 'Numéro libre (ex. : 1 pour le départ, 2 pour l\'arrivée).'} error=${codeText && !codeValid ? 'Entre 1 et 1023' : ''}>
+        <${Field} label=${isControlMode(mode) ? 'Numéro de poste' : 'Numéro du boîtier'} hint=${isControlMode(mode) ? 'De 31 à 255 en général (1 à 1023 possible). Il augmente de 1 après chaque programmation.' : 'Numéro libre (ex. : 1 pour le départ, 2 pour l\'arrivée).'} error=${codeText && !codeValid ? 'Entre 1 et 1023' : ''}>
           <input class="input mono" value=${codeText} inputmode="numeric" onInput=${(e) => setCodeText(e.target.value)} />
         <//>
         <label class="check"><input type="checkbox" checked=${syncTime} onChange=${(e) => setSyncTime(e.target.checked)} /><span>Mettre le boîtier à l'heure de l'ordinateur (recommandé)</span></label>
+        ${info &&
+        (changed
+          ? html`<div class="alert alert-warn mt"><${Icon} name="alert" /> <span>
+              Changement : <s>${settingLabel(info.mode, info.code)}</s> → <b>${settingLabel(mode, codeNum)}</b>
+              ${contactless(info.mode) && !contactless(mode) ? html`<br />Attention : le poinçonnage sans contact (SIAC) sera désactivé.` : ''}
+            </span></div>`
+          : html`<p class="muted small mt">Aucun changement par rapport au boîtier lu.</p>`)}
         <div class="row-actions">
-          <${Button} variant="primary" icon="settings" onClick=${program} disabled=${!st.connected || busy || !codeValid}>Programmer ${remote ? 'le boîtier' : 'le lecteur'}</${Button}>
+          ${info
+            ? html`<${Button} variant="primary" icon="check" onClick=${program} disabled=${!st.connected || busy || !changed}>Valider les réglages</${Button}>`
+            : html`<${Button} variant="primary" icon="settings" onClick=${program} disabled=${!st.connected || busy || !codeValid}>Programmer ${remote ? 'le boîtier' : 'le lecteur'}</${Button}>`}
         </div>
-        <p class="muted small mt">CO - P3OPS écrit la fonction et le numéro, règle l'heure, puis relit le boîtier pour vérifier.</p>
+        <p class="muted small mt">CO - P3OPS écrit la fonction et le numéro${syncTime ? ", règle l'heure" : ''}, puis relit le boîtier pour vérifier. Pour régler seulement l'heure : bouton « Mettre à l'heure », sous l'heure du boîtier.</p>
       <//>
     </div>
 
     <${KnownBalises}
       onPick=${(code) => {
-        setMode(0x02);
+        setMode(info && isControlMode(info.mode) ? info.mode : 0x02);
         setCodeText(String(code));
         setRemote(true);
         toast(`Balise ${code} choisie : posez le boîtier sur le lecteur, puis « Programmer le boîtier ».`, 'info');
@@ -290,7 +349,7 @@ export function StationsPage() {
               ${log.map(
                 (e, i) => html`<tr key=${i}>
                   <td class="mono">${new Date(e.at).toLocaleTimeString('fr-FR').slice(0, 5)}</td>
-                  <td>${e.action === 'Programmé' ? html`<${Badge} kind="ok">programmé<//>` : html`<${Badge} kind="muted">contrôlé<//>`}</td>
+                  <td>${e.action === 'Programmé' ? html`<${Badge} kind="ok">programmé<//>` : e.action === "Mis à l'heure" ? html`<${Badge} kind="info">mis à l'heure<//>` : html`<${Badge} kind="muted">contrôlé<//>`}</td>
                   <td>${e.model} <span class="mono">${e.serial}</span></td>
                   <td>${modeLabel(e.mode)}</td>
                   <td class="num mono">${e.code}</td>

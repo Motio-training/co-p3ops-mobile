@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { bus } from './bus.js';
 import { norm, uid } from './util.js';
 import { DEFAULT_SCORING } from '../domain/scoring.js';
+import { isControlMode } from '../sportident/constants.js';
 
 export const settings = { loaded: false, error: null, circuits: [], baremes: [], balises: [] };
 
@@ -54,10 +55,10 @@ export function loadSettings(force = false) {
       if (!Array.isArray(balises)) {
         // Premier lancement : les balises des circuits connus et les boîtiers déjà contrôlés sur ce poste.
         const codes = new Set(circuits.flatMap((c) => c.controls || []));
-        for (const e of stationLog()) if (e.mode === 0x02 && e.code) codes.add(e.code);
+        for (const e of stationLog()) if (isControlMode(e.mode) && e.code) codes.add(e.code);
         balises = [...codes].sort((a, b) => a - b).map((code) => ({ code }));
         for (const e of stationLog().slice().reverse()) {
-          const b = balises.find((x) => x.code === e.code && e.mode === 0x02);
+          const b = balises.find((x) => x.code === e.code && isControlMode(e.mode));
           if (b) Object.assign(b, { serial: e.serial, battery: e.battery, drift: e.drift, checkedAt: e.at });
         }
         // (un serveur d'une version précédente, pas encore relancé, ne connaît pas ce réglage : on continue)
@@ -118,7 +119,7 @@ export function removeBalise(code) {
 
 /** Boîtier « poste » lu ou programmé : sa balise est ajoutée ou mise à jour (batterie, horloge, date). */
 export function noteBaliseChecked(info) {
-  if (!settings.loaded || info?.mode !== 0x02 || !info.code) return Promise.resolve();
+  if (!settings.loaded || !isControlMode(info?.mode) || !info.code) return Promise.resolve();
   const entry = { code: info.code, serial: info.serial, battery: info.batteryPercent ?? null, drift: info.drift ?? null, checkedAt: Date.now() };
   const others = settings.balises.filter((b) => b.code !== info.code);
   const prev = settings.balises.find((b) => b.code === info.code) || {};

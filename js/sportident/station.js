@@ -442,11 +442,22 @@ export class Station extends EventTarget {
     });
   }
 
+  /** Met le boîtier à l'heure de l'appareil, puis relit son horloge. */
+  syncClock(remote) {
+    return this.withTarget(remote, async () => {
+      await this.setClock(new Date());
+      const clock = await this.readClock();
+      return { clock, clockReadAt: new Date() };
+    });
+  }
+
   /** Programme la fonction et le n° de poste (et l'heure), puis relit pour vérifier. */
-  program(remote, { mode, code, syncTime = true }) {
+  program(remote, { mode, code, syncTime = true, expectSerial = null }) {
     if (!Number.isInteger(code) || code < 1 || code > 1023) return Promise.reject(new Error('N° de poste invalide (1 à 1023).'));
     return this.withTarget(remote, async () => {
       const before = await this.readSystem();
+      if (expectSerial && before.serial !== expectSerial)
+        throw new Error(`ce n'est plus le boîtier lu (n° ${expectSerial}) qui est posé sur le lecteur, mais le n° ${before.serial} : relisez-le d'abord`);
       const b73 = (before.raw[0x73] & 0x3f) | (((code >> 8) & 3) << 6);
       await this.writeSys(0x71, [mode, code & 0xff, b73]);
       if (syncTime) await this.setClock(new Date());

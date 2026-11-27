@@ -141,10 +141,18 @@
    "code": 48
   },
   {
-   "code": 49
+   "code": 49,
+   "serial": 597577,
+   "battery": null,
+   "drift": 0,
+   "checkedAt": 1795772567077
   },
   {
-   "code": 50
+   "code": 50,
+   "serial": 597577,
+   "battery": null,
+   "drift": 0,
+   "checkedAt": 1795772727791
   }
  ]
 }
