@@ -7,7 +7,7 @@ import { norm, uid } from './util.js';
 import { DEFAULT_SCORING } from '../domain/scoring.js';
 import { isControlMode } from '../sportident/constants.js';
 
-export const settings = { loaded: false, error: null, circuits: [], baremes: [], balises: [] };
+export const settings = { loaded: false, error: null, circuits: [], baremes: [], balises: [], boitiers: [] };
 
 let loading = null;
 
@@ -64,7 +64,19 @@ export function loadSettings(force = false) {
         // (un serveur d'une version précédente, pas encore relancé, ne connaît pas ce réglage : on continue)
         await api.putSetting('balises', balises).catch(() => {});
       }
-      Object.assign(settings, { loaded: true, error: null, circuits, baremes, balises });
+      let boitiers = data.boitiers;
+      if (!Array.isArray(boitiers)) {
+        // Premier lancement : les boîtiers déjà contrôlés sur ce poste (ancien journal du navigateur).
+        const map = new Map();
+        for (const e of stationLog().slice().reverse()) {
+          if (!e.serial) continue;
+          const prev = map.get(e.serial) || { serial: e.serial, history: [] };
+          map.set(e.serial, stationRecord(prev, e, e.action || 'Contrôle', e.at));
+        }
+        boitiers = [...map.values()];
+        await api.putSetting('boitiers', boitiers).catch(() => {});
+      }
+      Object.assign(settings, { loaded: true, error: null, circuits, baremes, balises, boitiers });
     } catch (e) {
       settings.error = e.message;
       loading = null;
@@ -95,6 +107,44 @@ function stationLog() {
   } catch {
     return [];
   }
+}
+
+// --- Boîtiers SportIdent contrôlés (mémoire par n° de série, conservée aux mises à jour) ----------------
+/** Fiche d'un boîtier mise à jour après un contrôle, une mise à l'heure ou une programmation. */
+function stationRecord(prev, info, action, at = Date.now()) {
+  const battery = info.batteryPercent ?? info.battery ?? prev.battery ?? null;
+  const rec = {
+    ...prev,
+    serial: info.serial,
+    model: info.model ?? prev.model,
+    firmware: info.firmware ?? prev.firmware,
+    mode: info.mode ?? prev.mode,
+    code: info.code ?? prev.code,
+    battery,
+    capacityMah: info.capacityMah ?? prev.capacityMah ?? null,
+    usedMah: info.usedMah ?? prev.usedMah ?? null,
+    batteryDate: info.batteryDate ?? prev.batteryDate ?? null,
+    drift: info.drift ?? prev.drift ?? null,
+    firstSeenAt: prev.firstSeenAt || at,
+    checkedAt: at,
+  };
+  if (action === "Mis à l'heure" || (action === 'Programmé' && info.synced)) rec.clockSetAt = at;
+  if (action === 'Programmé') rec.programmedAt = at;
+  rec.history = [{ at, action, mode: rec.mode, code: rec.code, battery, drift: rec.drift }, ...(prev.history || [])].slice(0, 30);
+  return rec;
+}
+
+/** Fiche enregistrée d'un boîtier (ou null). */
+export function stationInfo(serial) {
+  return settings.boitiers.find((b) => b.serial === serial) || null;
+}
+
+/** Enregistre le contrôle d'un boîtier (action : « Contrôle », « Mis à l'heure » ou « Programmé »). */
+export function noteStationChecked(info, action = 'Contrôle') {
+  if (!settings.loaded || !info?.serial) return Promise.resolve();
+  const prev = stationInfo(info.serial) || {};
+  const rec = stationRecord(prev, info, action);
+  return save('boitiers', [rec, ...settings.boitiers.filter((b) => b.serial !== info.serial)]);
 }
 
 // --- Balises connues (numéros des boîtiers « poste ») --------------------------------------------------

@@ -6,7 +6,7 @@
 import { buildXlsx } from './xlsx.js';
 
 const KINDS = ['course', 'class', 'competitor', 'card'];
-const SETTING_KEYS = ['circuits', 'baremes', 'balises'];
+const SETTING_KEYS = ['circuits', 'baremes', 'balises', 'boitiers'];
 const DB_NAME = 'co-p3ops-mobile';
 
 // --- Stockage (IndexedDB) ------------------------------------------------------------------------
@@ -159,10 +159,10 @@ async function getSettings() {
   const all = await tx('settings', 'readonly', (st) => req(st.getAll()));
   const stored = Object.fromEntries(all.map((r) => [r.key, r.data]));
   const init = await initialSettings();
-  const seen = stored._initial || { circuits: [], baremes: [], balises: [] };
+  const seen = stored._initial || { circuits: [], baremes: [], balises: [], boitiers: [] };
   const changed = new Set();
-  for (const key of ['circuits', 'baremes', 'balises']) {
-    const idOf = key === 'balises' ? (x) => x.code : (x) => x.id;
+  for (const key of ['circuits', 'baremes', 'balises', 'boitiers']) {
+    const idOf = key === 'balises' ? (x) => x.code : key === 'boitiers' ? (x) => x.serial : (x) => x.id;
     for (const item of init[key] || []) {
       const id = idOf(item);
       if (id == null || (seen[key] || []).includes(id)) continue;

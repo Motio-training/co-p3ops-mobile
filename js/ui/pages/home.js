@@ -165,7 +165,7 @@ export function HomePage() {
     html`<div class="home-more">
       <${Tile} icon="route" title="Circuits" text="Créer et modifier les circuits" onClick=${() => go('circuits')} />
       <${Tile} icon="trophy" title="Barèmes" text="Créer et modifier les barèmes" onClick=${() => go('baremes')} />
-      <${Tile} icon="settings" title="Programmer les boîtiers" text="Balises, fonction, batterie, heure" onClick=${() => go('boitiers')} />
+      <${Tile} icon="settings" title="Boîtiers et puces" text="Heure, batterie et numéro des boîtiers · lecture et effacement des puces" onClick=${() => go('boitiers')} />
     </div>`}
 
     <p class="home-foot muted">

@@ -44,7 +44,7 @@ const NAV_SCORE = [
       { id: 'coureurs', label: 'Personnels', icon: 'users' },
       { id: 'circuits', label: 'Balises', icon: 'route' },
       { id: 'categories', label: 'Catégories', icon: 'tag' },
-      { id: 'boitiers', label: 'Programmer les boîtiers', icon: 'settings' },
+      { id: 'boitiers', label: 'Boîtiers et puces', icon: 'settings' },
     ],
   },
   {
@@ -65,7 +65,7 @@ const NAV = [
       { id: 'categories', label: 'Catégories', icon: 'tag' },
       { id: 'coureurs', label: 'Coureurs', icon: 'users' },
       { id: 'departs', label: 'Départs', icon: 'clock' },
-      { id: 'boitiers', label: 'Programmer les boîtiers', icon: 'settings' },
+      { id: 'boitiers', label: 'Boîtiers et puces', icon: 'settings' },
     ],
   },
   {

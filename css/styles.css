@@ -4689,6 +4689,45 @@ button.rank-row {
   }
 }
 
+/* Lecture et effacement des puces */
+.mb {
+  margin-bottom: 14px;
+}
+.chip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.chip-number {
+  font-size: 26px;
+  font-weight: 700;
+}
+.clearing-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  border-radius: var(--radius);
+  background: var(--err);
+  color: #fff;
+  animation: clearing-pulse 1.6s ease-in-out infinite;
+}
+.clearing-banner > div {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+@keyframes clearing-pulse {
+  50% {
+    opacity: 0.88;
+  }
+}
+
 /* Programmation des boîtiers : heure en direct */
 .mt-sm {
   margin-top: 6px;

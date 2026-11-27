@@ -175,7 +175,11 @@ export class SimulatedPort {
   /** Simule l'insertion d'une puce dans le boîtier. */
   insert(card) {
     if (!this.controller) return false;
+    // Lecteur en mode « Effacement » : la puce est vidée dès qu'elle est insérée, puis retirée.
+    const clearing = this.master.sys[0x71] === 0x07;
+    if (clearing) card = { ...card, punches: [], start: null, finish: null, check: null };
     this.card = encodeCard(card);
+    if (clearing) setTimeout(() => this.onAck(), 200);
     const n = card.number;
     const { type, series } = this.card;
     let cmd;

@@ -5,25 +5,21 @@ import { station, humanError } from '../../sportident/station.js';
 import { CONFIG_MODES, MODE_NAMES, MODE_READOUT, isControlMode } from '../../sportident/constants.js';
 import { Badge, Button, Card, Field, Icon, PageHeader, Segmented, EmptyState } from '../components.js';
 import { useSettings, useStation } from '../hooks.js';
-import { addBalises, noteBaliseChecked, removeBalise } from '../../core/settings.js';
+import { addBalises, noteBaliseChecked, noteStationChecked, removeBalise, stationInfo } from '../../core/settings.js';
 import { parseCodeList } from './control-picker.js';
 import { StationPanel } from './readout.js';
+import { ChipsPanel } from './chips.js';
 
-const LOG_KEY = 'balise.boitiers';
-
-function loadLog() {
-  try {
-    return JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function saveLog(list) {
-  try {
-    localStorage.setItem(LOG_KEY, JSON.stringify(list.slice(0, 300)));
-  } catch {}
-}
+const fmtWhen = (at) => {
+  if (!at) return '';
+  const d = new Date(at);
+  const today = new Date().toDateString() === d.toDateString();
+  return `${today ? "aujourd'hui" : 'le ' + d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR').slice(0, 5)}`;
+};
+const fmtAgo = (at) => {
+  const days = Math.floor((Date.now() - at) / 86400000);
+  return days < 1 ? '' : days === 1 ? ' (hier)' : ` (il y a ${days} jours)`;
+};
 
 function driftOf(info) {
   if (!info?.clock || !info.clockReadAt) return null;
@@ -81,9 +77,15 @@ function InfoGrid({ info, onSyncClock, busy }) {
       ${info.batteryPercent != null && info.batteryPercent < 20 && html`<br /><span class="text-err small"><b>Pile à changer</b> avant la prochaine course.</span>`}
       ${info.batteryDate && html`<br /><span class="muted small">Pile changée le ${info.batteryDate}</span>`}
     </dd>
+    <dt>Contrôle</dt>
+    <dd>
+      <strong>${fmtWhen(info.checkedNow || Date.now())}</strong>
+      <br /><span class="muted small">${info.prev?.checkedAt ? `Contrôle précédent : ${fmtWhen(info.prev.checkedAt)}${fmtAgo(info.prev.checkedAt)}` : 'Premier contrôle enregistré pour ce boîtier'}</span>
+    </dd>
     <dt>Heure</dt>
     <dd>
       <${LiveClock} info=${info} />
+      <br /><span class="muted small">${info.clockSetNow ? `Mis à l'heure ${fmtWhen(info.clockSetNow)}` : info.prev?.clockSetAt ? `Dernière mise à l'heure : ${fmtWhen(info.prev.clockSetAt)}` : "Jamais mis à l'heure par CO - P3OPS"}</span>
       ${onSyncClock &&
       html`<div class="mt-sm"><${Button} small variant=${late ? 'primary' : 'secondary'} icon="clock" onClick=${onSyncClock} disabled=${busy}>${late ? "Mettre à l'heure" : "Resynchroniser l'heure"}</${Button}></div>`}
     </dd>
@@ -158,6 +160,27 @@ function KnownBalises({ onPick }) {
 }
 
 export function StationsPage() {
+  const [tab, setTab] = useState('boitiers');
+  return html`
+    <${PageHeader} title="Boîtiers et puces" subtitle="Boîtiers : heure, batterie, fonction et numéro de poste. Puces : contenu et effacement.">
+      ${!location.hash.startsWith('#/e/') && html`<${Button} icon="arrowLeft" onClick=${() => (location.hash = '#/')}>Accueil</${Button}>`}
+    <//>
+    <${StationPanel} />
+    <div class="mt mb">
+      <${Segmented}
+        value=${tab}
+        onChange=${setTab}
+        options=${[
+          { value: 'boitiers', label: 'Réglages des boîtiers', icon: 'settings' },
+          { value: 'puces', label: 'Lecture des puces', icon: 'search' },
+        ]}
+      />
+    </div>
+    ${tab === 'puces' ? html`<${ChipsPanel} />` : html`<${StationsTab} />`}
+  `;
+}
+
+function StationsTab() {
   const st = useStation();
   const [remote, setRemote] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -167,23 +190,11 @@ export function StationsPage() {
   const [syncTime, setSyncTime] = useState(true);
   const [done, setDone] = useState(null); // dernier boîtier programmé (relu)
   const [confirmed, setConfirmed] = useState(null); // résumé « avant → après » de la dernière programmation
-  const [log, setLog] = useState(loadLog());
+  const known = useSettings().boitiers;
 
-  const record = (i, action) => {
-    const entry = {
-      at: Date.now(),
-      action,
-      serial: i.serial,
-      model: i.model,
-      mode: i.mode,
-      code: i.code,
-      battery: i.batteryPercent,
-      drift: driftOf(i),
-    };
-    const next = [entry, ...log];
-    setLog(next);
-    saveLog(next);
-  };
+  // Mémoire du boîtier (date du contrôle, mise à l'heure, programmation, batterie) : enregistrée dans les
+  // réglages de l'application, conservée d'une mise à jour à l'autre.
+  const record = (i, action) => noteStationChecked({ ...i, drift: driftOf(i) }, action).catch(() => {});
 
   const run = async (fn) => {
     setBusy(true);
@@ -206,6 +217,8 @@ export function StationsPage() {
     run(async () => {
       const i = await station.inspect(remote);
       if (remote && i.serial === station.info?.serial) throw new Error("c'est le lecteur lui-même qui a répondu");
+      i.prev = stationInfo(i.serial); // contrôle précédent (avant celui-ci)
+      i.checkedNow = Date.now();
       setInfo(i);
       setDone(null);
       setConfirmed(null);
@@ -220,7 +233,7 @@ export function StationsPage() {
     run(async () => {
       const target = info || done;
       const c = await station.syncClock(remote);
-      const next = { ...target, ...c };
+      const next = { ...target, ...c, clockSetNow: Date.now() };
       if (info) setInfo(next);
       else setDone(next);
       record(next, "Mis à l'heure");
@@ -242,9 +255,10 @@ export function StationsPage() {
       }
       const { before, after } = await station.program(remote, { mode, code, syncTime, expectSerial: info?.serial || null });
       setConfirmed({ from: info ? settingLabel(before.mode, before.code) : null, to: settingLabel(after.mode, after.code), serial: after.serial, synced: syncTime });
+      const shownAfter = { ...after, prev: info?.prev ?? stationInfo(after.serial), checkedNow: Date.now(), clockSetNow: syncTime ? Date.now() : null };
       setInfo(null);
-      setDone(after);
-      record(after, 'Programmé');
+      setDone(shownAfter);
+      record({ ...after, synced: syncTime }, 'Programmé');
       noteBaliseChecked({ ...after, drift: driftOf(after) }).catch(() => {});
       toast(`Boîtier n° ${after.serial} programmé : ${modeLabel(after.mode)} ${after.code}${syncTime ? ', heure réglée' : ''}.`, 'success');
       if (isControlMode(mode)) setCodeText(String(Math.min(1023, code + 1))); // prêt pour le boîtier suivant
@@ -258,11 +272,6 @@ export function StationsPage() {
   const contactless = (m) => m >= 0x32 && m <= 0x34;
 
   return html`
-    <${PageHeader} title="Programmer les boîtiers" subtitle="Fonction, numéro de poste, heure et batterie des boîtiers SportIdent.">
-      ${!location.hash.startsWith('#/e/') && html`<${Button} icon="arrowLeft" onClick=${() => (location.hash = '#/')}>Accueil</${Button}>`}
-    <//>
-    <${StationPanel} />
-
     <div class="grid-2 stations-grid">
       <${Card} title="Boîtier à programmer">
         <${Segmented}
@@ -301,7 +310,10 @@ export function StationsPage() {
       <//>
 
       <${Card} title=${info ? 'Réglages du boîtier lu' : 'Nouvelle programmation'}>
-        ${info && html`<p class="muted small">Réglages actuels : <b>${settingLabel(info.mode, info.code)}</b>. Modifiez la fonction ou le numéro, puis validez.</p>`}
+        ${info && html`<p class="muted small">
+          Réglages actuels : <b>${settingLabel(info.mode, info.code)}</b> · contrôlé ${fmtWhen(info.checkedNow)}${info.prev?.checkedAt ? ` (précédent : ${fmtWhen(info.prev.checkedAt)})` : ''}.
+          Modifiez la fonction ou le numéro, puis validez.
+        </p>`}
         <${Field} label="Fonction">
           <select class="input" value=${mode} onChange=${(e) => setMode(Number(e.target.value))}>
             ${CONFIG_MODES.map((m) => html`<option value=${m.value}>${m.label}</option>`)}
@@ -336,30 +348,27 @@ export function StationsPage() {
       }}
     />
 
-    <${Card}
-      title=${`Boîtiers contrôlés (${log.length})`}
-      pad=${false}
-      class="mt"
-      actions=${log.length > 0 && html`<${Button} small onClick=${() => { setLog([]); saveLog([]); }}>Effacer la liste</${Button}>`}
-    >
-      ${log.length
+    <${Card} title=${`Boîtiers contrôlés (${known.length})`} pad=${false} class="mt">
+      ${known.length
         ? html`<div class="table-wrap"><table class="table">
-            <thead><tr><th>Heure</th><th>Action</th><th>Boîtier</th><th>Fonction</th><th class="num">N°</th><th>Batterie</th><th>Horloge</th></tr></thead>
+            <thead><tr><th>Dernier contrôle</th><th>Boîtier</th><th>Fonction</th><th class="num">N°</th><th>Batterie</th><th>Heure</th><th>Mis à l'heure</th></tr></thead>
             <tbody>
-              ${log.map(
-                (e, i) => html`<tr key=${i}>
-                  <td class="mono">${new Date(e.at).toLocaleTimeString('fr-FR').slice(0, 5)}</td>
-                  <td>${e.action === 'Programmé' ? html`<${Badge} kind="ok">programmé<//>` : e.action === "Mis à l'heure" ? html`<${Badge} kind="info">mis à l'heure<//>` : html`<${Badge} kind="muted">contrôlé<//>`}</td>
-                  <td>${e.model} <span class="mono">${e.serial}</span></td>
-                  <td>${modeLabel(e.mode)}</td>
-                  <td class="num mono">${e.code}</td>
-                  <td><${BatteryGauge} percent=${e.battery} /></td>
-                  <td class=${e.drift != null && Math.abs(e.drift) > 2 ? 'text-warn' : ''}>${fmtDrift(e.drift)}</td>
-                </tr>`
-              )}
+              ${[...known]
+                .sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0))
+                .map(
+                  (b) => html`<tr key=${b.serial}>
+                    <td>${b.checkedAt ? new Date(b.checkedAt).toLocaleDateString('fr-FR') : '—'} <span class="muted small mono">${b.checkedAt ? new Date(b.checkedAt).toLocaleTimeString('fr-FR').slice(0, 5) : ''}</span></td>
+                    <td>${b.model || 'Boîtier'} <span class="mono">${b.serial}</span></td>
+                    <td>${b.mode != null ? modeLabel(b.mode) : '—'}</td>
+                    <td class="num mono">${b.code ?? ''}</td>
+                    <td><${BatteryGauge} percent=${b.battery} /></td>
+                    <td class=${b.drift != null && Math.abs(b.drift) > 2 ? 'text-warn' : ''}>${fmtDrift(b.drift)}</td>
+                    <td>${b.clockSetAt ? new Date(b.clockSetAt).toLocaleDateString('fr-FR') : html`<span class="muted">—</span>`}</td>
+                  </tr>`
+                )}
             </tbody>
           </table></div>`
-        : html`<${EmptyState} icon="battery" title="Aucun boîtier contrôlé" text="Chaque boîtier lu ou programmé s'ajoute ici : vous voyez d'un coup d'œil les batteries faibles et les horloges décalées." />`}
+        : html`<${EmptyState} icon="battery" title="Aucun boîtier contrôlé" text="Chaque boîtier lu, mis à l'heure ou programmé est enregistré ici avec la date du contrôle, sa batterie et son heure. Cette liste est conservée lors des mises à jour." />`}
     <//>
   `;
 }

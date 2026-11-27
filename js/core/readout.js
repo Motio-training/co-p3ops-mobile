@@ -10,6 +10,9 @@ import { printTicket } from '../io/reports.js';
 
 export const readout = { lastId: null, reading: null };
 
+/** Page « Lecture des puces » ouverte : les puces lues y sont affichées, sans être enregistrées dans une course. */
+export const chipReader = { active: false };
+
 export function initReadout() {
   station.addEventListener('card-reading', (e) => {
     readout.reading = e.detail;
@@ -23,6 +26,11 @@ export function initReadout() {
   });
   station.addEventListener('card', (e) => {
     readout.reading = null;
+    if (chipReader.active) {
+      bus.emit('chip-read', e.detail.card);
+      playSound('ok');
+      return;
+    }
     handleCard(e.detail.card, e.detail.source);
   });
   // Le lecteur habituel est déjà branché au démarrage : il est connecté sans rien toucher.

@@ -43,6 +43,22 @@ export function humanError(e) {
   return msg;
 }
 
+const MODE_READOUT_CODE = 0x05;
+const CLEARING_KEY = 'p3ops.lecteur-en-effacement';
+function clearingMarker() {
+  try {
+    return localStorage.getItem(CLEARING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function setClearingMarker(on) {
+  try {
+    if (on) localStorage.setItem(CLEARING_KEY, '1');
+    else localStorage.removeItem(CLEARING_KEY);
+  } catch {}
+}
+
 export class Station extends EventTarget {
   constructor() {
     super();
@@ -163,10 +179,21 @@ export class Station extends EventTarget {
     this.wanted = simulated ? null : { port, vid: pi.usbVendorId, pid: pi.usbProductId };
     this.log('i', null, `Connecté à ${this.baudRate} bauds — ${this.info.model}, mode ${this.info.modeName || '?'}`);
     this.setState('connected');
+    // Lecteur resté en « Effacement » après une coupure pendant l'effacement des puces : remis en « Lecture ».
+    if (this.info.mode === 0x07 && clearingMarker()) {
+      try {
+        await this.programReader(MODE_READOUT_CODE);
+        setClearingMarker(false);
+        this.log('i', null, 'Lecteur resté en mode Effacement : remis en mode Lecture');
+      } catch {}
+    }
     return this.info;
   }
 
   async disconnect({ keepWanted = false, manual = false } = {}) {
+    // Effacement des puces en cours : le lecteur est d'abord remis en « Lecture ».
+    if (this.clearing && this.writer) await this.stopClearing().catch(() => {});
+    this.clearing = false;
     if (!keepWanted) this.wanted = null;
     // « Déconnecter » à la main : pas de reconnexion automatique avant que le lecteur soit rebranché.
     if (manual) this.manualOff = true;
@@ -442,6 +469,40 @@ export class Station extends EventTarget {
     });
   }
 
+  /** Change la fonction du lecteur lui-même (même numéro), vérifiée par relecture. */
+  async programReader(mode) {
+    const code = this.info?.code || 1;
+    const { after } = await this.program(false, { mode, code, syncTime: false });
+    this.info = { ...this.info, mode: after.mode, modeName: MODE_NAMES[after.mode] || `mode ${after.mode}` };
+    this.emit('state', { state: this.state, message: this.message });
+    return after;
+  }
+
+  /**
+   * Effacement des puces : le lecteur passe en fonction « Effacement » ; chaque puce insérée est vidée
+   * (poinçons, départ, arrivée). stopClearing() le remet en « Lecture ».
+   */
+  async startClearing() {
+    if (!this.connected) throw new Error("Connectez d'abord le lecteur.");
+    setClearingMarker(true); // en cas de coupure, le lecteur sera remis en « Lecture » à la reconnexion
+    try {
+      await this.programReader(0x07);
+    } catch (e) {
+      setClearingMarker(false);
+      throw e;
+    }
+    this.clearing = true;
+    this.emit('clearing', { on: true });
+  }
+
+  async stopClearing() {
+    if (!this.clearing && this.info?.mode !== 0x07) return;
+    this.clearing = false;
+    await this.programReader(MODE_READOUT_CODE);
+    setClearingMarker(false);
+    this.emit('clearing', { on: false });
+  }
+
   /** Met le boîtier à l'heure de l'appareil, puis relit son horloge. */
   syncClock(remote) {
     return this.withTarget(remote, async () => {
@@ -473,6 +534,11 @@ export class Station extends EventTarget {
   onDetect(cmd, data) {
     const det = detectionInfo(cmd, data);
     if (!det) return;
+    if (this.clearing) {
+      this.log('i', null, `Puce ${det.number} insérée dans le lecteur en mode Effacement`);
+      this.emit('card-cleared', det);
+      return;
+    }
     if (this.configuring) {
       this.log('i', null, `Puce ${det.number} ignorée pendant la programmation d'un boîtier`);
       return;

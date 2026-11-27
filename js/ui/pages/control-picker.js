@@ -63,7 +63,7 @@ export function ControlPicker({ value, onChange, ordered = false }) {
             </button>`;
           })}
         </div>`
-      : html`<p class="muted small">Aucune balise connue pour l'instant : ajoutez leurs numéros ci-dessous (ou dans « Programmer les boîtiers »).</p>`}
+      : html`<p class="muted small">Aucune balise connue pour l'instant : ajoutez leurs numéros ci-dessous (ou dans « Boîtiers et puces »).</p>`}
     <div class="picker-add">
       <input class="input input-sm mono" value=${adding} placeholder="Autre balise : 51 ou 51-55" onInput=${(e) => setAdding(e.target.value)} onKeyDown=${(e) => {
         if (e.key === 'Enter') {

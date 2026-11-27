@@ -150,9 +150,10 @@
   {
    "code": 50,
    "serial": 597577,
-   "battery": null,
+   "battery": 99,
    "drift": 0,
-   "checkedAt": 1795772727791
+   "checkedAt": 1795773268601
   }
- ]
+ ],
+ "boitiers": []
 }
