@@ -156,6 +156,32 @@ export function saveBalises(list) {
   return save('balises', [...seen.values()].sort(byCode));
 }
 
+/**
+ * Position d'un poste sur la carte : { lat, lon, acc (m), source: 'manuel' | 'gps', at }.
+ * pos = null retire la position.
+ */
+export function setBalisePosition(code, pos) {
+  const prev = settings.balises.find((b) => b.code === code) || { code };
+  const next = { ...prev };
+  if (pos) next.pos = { lat: pos.lat, lon: pos.lon, acc: pos.acc ?? null, source: pos.source || 'manuel', at: pos.at || Date.now() };
+  else delete next.pos;
+  return saveBalises([...settings.balises.filter((b) => b.code !== code), next]);
+}
+
+/**
+ * Poste contrôlé sur place : sa position est précisée avec le GPS si la mesure est assez précise et
+ * meilleure que celle enregistrée (un placement à la main est toujours remplacé par une mesure GPS).
+ * Renvoie la position retenue, ou null si rien n'a changé.
+ */
+export async function refineBalisePosition(code, fix, maxAcc = 40) {
+  if (!settings.loaded || !fix || !(fix.acc <= maxAcc)) return null;
+  const cur = settings.balises.find((b) => b.code === code)?.pos;
+  if (cur && cur.source === 'gps' && cur.acc != null && cur.acc <= fix.acc) return null;
+  const pos = { lat: fix.lat, lon: fix.lon, acc: Math.round(fix.acc), source: 'gps', at: Date.now() };
+  await setBalisePosition(code, pos);
+  return { ...pos, previous: cur || null };
+}
+
 /** Ajoute des numéros de balises (sans doublon). */
 export function addBalises(codes) {
   const known = new Set(settings.balises.map((b) => b.code));

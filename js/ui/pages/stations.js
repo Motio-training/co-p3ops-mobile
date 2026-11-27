@@ -5,10 +5,19 @@ import { station, humanError } from '../../sportident/station.js';
 import { CONFIG_MODES, MODE_NAMES, MODE_READOUT, isControlMode } from '../../sportident/constants.js';
 import { Badge, Button, Card, Field, Icon, PageHeader, Segmented, EmptyState } from '../components.js';
 import { useSettings, useStation } from '../hooks.js';
-import { addBalises, noteBaliseChecked, noteStationChecked, removeBalise, stationInfo } from '../../core/settings.js';
+import { addBalises, noteBaliseChecked, noteStationChecked, refineBalisePosition, removeBalise, stationInfo } from '../../core/settings.js';
 import { parseCodeList } from './control-picker.js';
 import { StationPanel } from './readout.js';
 import { ChipsPanel } from './chips.js';
+import { PlanTab } from './map.js';
+import { currentFix, gpsWasEnabled } from '../../map/gps.js';
+
+const distanceM = (a, b) => {
+  const r = Math.PI / 180;
+  const x = (b.lon - a.lon) * r * Math.cos(((a.lat + b.lat) / 2) * r);
+  const y = (b.lat - a.lat) * r;
+  return Math.sqrt(x * x + y * y) * 6371000;
+};
 
 const fmtWhen = (at) => {
   if (!at) return '';
@@ -173,10 +182,11 @@ export function StationsPage() {
         options=${[
           { value: 'boitiers', label: 'Réglages des boîtiers', icon: 'settings' },
           { value: 'puces', label: 'Lecture des puces', icon: 'search' },
+          { value: 'plan', label: 'Plan des postes', icon: 'map' },
         ]}
       />
     </div>
-    ${tab === 'puces' ? html`<${ChipsPanel} />` : html`<${StationsTab} />`}
+    ${tab === 'puces' ? html`<${ChipsPanel} />` : tab === 'plan' ? html`<${PlanTab} />` : html`<${StationsTab} />`}
   `;
 }
 
@@ -194,7 +204,21 @@ function StationsTab() {
 
   // Mémoire du boîtier (date du contrôle, mise à l'heure, programmation, batterie) : enregistrée dans les
   // réglages de l'application, conservée d'une mise à jour à l'autre.
-  const record = (i, action) => noteStationChecked({ ...i, drift: driftOf(i) }, action).catch(() => {});
+  const record = (i, action) => {
+    noteStationChecked({ ...i, drift: driftOf(i) }, action).catch(() => {});
+    if (remote && isControlMode(i.mode) && i.code && gpsWasEnabled()) locatePoste(i.code);
+  };
+
+  // Le boîtier est posé sur le lecteur : on est donc au poste. Sa position est précisée avec le GPS.
+  const locatePoste = (code) =>
+    currentFix({ maxAcc: 40, wait: 15000 })
+      .then((fix) => (fix ? refineBalisePosition(code, fix) : null))
+      .then((pos) => {
+        if (!pos) return;
+        const moved = pos.previous ? ` (déplacé de ${Math.round(distanceM(pos.previous, pos))} m)` : '';
+        toast(`Position du poste ${code} ${pos.previous ? 'précisée' : 'enregistrée'} au GPS : ±${pos.acc} m${moved}.`, 'success');
+      })
+      .catch(() => {});
 
   const run = async (fn) => {
     setBusy(true);

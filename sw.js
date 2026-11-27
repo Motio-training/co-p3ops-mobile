@@ -1,7 +1,7 @@
 // CO - P3OPS Mobile : fonctionnement hors connexion. Tous les fichiers de l'application sont gardés
 // dans le téléphone à la première ouverture ; ensuite l'appli s'ouvre même sans réseau.
 // (Fichier généré par mobile/construire-mobile.py : la liste et la version sont remplies à la construction.)
-const VERSION = "co-p3ops-mobile-20261127-a4c83cf811";
+const VERSION = "co-p3ops-mobile-20261127-ea281971e3";
 const FILES = [
  "./",
  "css/mobile.css",
@@ -31,6 +31,9 @@ const FILES = [
  "js/io/xlsx-read.js",
  "js/lib.js",
  "js/main.js",
+ "js/map/geo.js",
+ "js/map/gps.js",
+ "js/map/tiles.js",
  "js/mobile/boot.js",
  "js/mobile/local-server.js",
  "js/mobile/usb-serial.js",
@@ -59,6 +62,7 @@ const FILES = [
  "js/ui/pages/guide.js",
  "js/ui/pages/home.js",
  "js/ui/pages/import-check.js",
+ "js/ui/pages/map.js",
  "js/ui/pages/readout-view.js",
  "js/ui/pages/readout.js",
  "js/ui/pages/results.js",
@@ -85,7 +89,8 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      // anciennes versions de l'application seulement : les cartes gardées pour le hors ligne restent
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k.startsWith('co-p3ops-mobile-')).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
