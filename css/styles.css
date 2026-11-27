@@ -5104,3 +5104,14 @@ button.rank-row {
   align-items: center;
   gap: 5px;
 }
+
+/* Appui long sur un poste : il « décolle » et suit le doigt */
+.map-wrap {
+  -webkit-touch-callout: none;
+}
+.map-poste.dragging .map-poste-in {
+  border-color: #e8590c;
+  background: rgba(232, 89, 12, 0.25);
+  box-shadow: 0 0 0 2px #fff, 0 6px 14px rgba(0, 0, 0, 0.35);
+  scale: 1.35;
+}

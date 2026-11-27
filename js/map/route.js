@@ -1,8 +1,10 @@
 // Itinéraires à pied entre la position GPS et les postes, « à travers champs » : on suit routes et chemins
 // quand c'est plus rapide, sinon on coupe à travers champs ou sous-bois praticables (voir terrain.js).
 // Plusieurs postes : temps de marche entre chaque paire de points, puis ordre de passage le plus rapide
-// (calcul exact jusqu'à 10 postes, au-delà ordre approché). Sans données de terrain (pas de réseau et zone
-// jamais enregistrée) : trajets à vol d'oiseau.
+// (calcul exact jusqu'à 10 postes, au-delà ordre approché).
+// Jamais de trajet infranchissable : sans données de terrain (zone trop grande, ou pas de réseau et zone
+// jamais enregistrée), on suit le réseau de routes et chemins de l'IGN ; si c'est impossible aussi, aucun
+// tracé (seulement la distance et la direction).
 import { distance } from './geo.js';
 import { boundsAround, buildGrid, cellOf, cellPath, dijkstra, latLonOf, loadTerrain, smoothPath, spanM } from './terrain.js';
 
@@ -12,9 +14,44 @@ const OFF_TRAIL = 0.8; // m/s pour les trajets à vol d'oiseau
 
 const pause = () => new Promise((r) => setTimeout(r, 0));
 
-function straightLeg(a, b) {
+/** Étape sans tracé possible : on garde seulement la distance (pour l'ordre de passage). */
+function noLeg(a, b) {
   const d = distance(a, b);
-  return { legs: [{ coords: [a, b], offTrail: true }], distance: d, duration: d / OFF_TRAIL, straight: true };
+  return { legs: [], distance: d, duration: d / OFF_TRAIL, none: true };
+}
+
+// Secours : itinéraire piéton sur routes et chemins (service d'itinéraire de la Géoplateforme de l'IGN)
+const SERVICE = 'https://data.geopf.fr/navigation/itineraire';
+const netCache = new Map();
+async function networkLeg(a, b, signal) {
+  const k = `${a.lat.toFixed(5)},${a.lon.toFixed(5)}>${b.lat.toFixed(5)},${b.lon.toFixed(5)}`;
+  if (netCache.has(k)) return netCache.get(k);
+  try {
+    const url =
+      `${SERVICE}?resource=bdtopo-osrm&profile=pedestrian&optimization=shortest` +
+      `&start=${a.lon.toFixed(6)},${a.lat.toFixed(6)}&end=${b.lon.toFixed(6)},${b.lat.toFixed(6)}` +
+      '&geometryFormat=geojson&getSteps=false&distanceUnit=meter&timeUnit=second';
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(String(res.status));
+    const d = await res.json();
+    const line = (d.geometry?.coordinates || []).map(([lon, lat]) => ({ lat, lon }));
+    if (line.length < 2) throw new Error('vide');
+    const s = line[0];
+    const e = line[line.length - 1];
+    const head = distance(a, s);
+    const tail = distance(e, b);
+    const r = {
+      legs: [...(head > 3 ? [{ coords: [a, s], offTrail: true }] : []), { coords: line, offTrail: false }, ...(tail > 3 ? [{ coords: [e, b], offTrail: true }] : [])],
+      distance: (d.distance ?? 0) + head + tail,
+      duration: (d.duration ?? (d.distance ?? 0) / 1.25) + (head + tail) / OFF_TRAIL,
+      network: true,
+    };
+    netCache.set(k, r);
+    return r;
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    return null;
+  }
 }
 
 /** Ordre de visite le plus rapide de k points depuis le nœud 0 (cost(i, j) entre nœuds 0..k). */
@@ -98,7 +135,7 @@ export async function planTour(start, points, { back = false, onProgress, signal
   let grid = null;
   let reason = null;
   const bounds = boundsAround(nodes, Math.max(250, spanM(boundsAround(nodes, 0)) * 0.2));
-  if (spanM(bounds) > MAX_SPAN) reason = 'Postes trop éloignés pour un itinéraire à travers champs : trajets à vol d’oiseau.';
+  if (spanM(bounds) > MAX_SPAN) reason = 'Postes trop éloignés pour un itinéraire à travers champs : itinéraire par les routes et chemins.';
   else {
     try {
       const data = await loadTerrain(bounds, { onProgress: (d, t) => onProgress?.('terrain', d, t), signal });
@@ -108,7 +145,7 @@ export async function planTour(start, points, { back = false, onProgress, signal
       grid = buildGrid(bounds, data, cs);
     } catch (e) {
       if (e.name === 'AbortError') throw e;
-      reason = 'Pas de réseau et zone pas encore enregistrée : trajets à vol d’oiseau.';
+      reason = 'Terrain de la zone indisponible (pas de réseau et zone pas enregistrée) : itinéraire par les routes et chemins.';
     }
   }
 
@@ -125,15 +162,44 @@ export async function planTour(start, points, { back = false, onProgress, signal
       onProgress?.('calcul', i + 1, nodes.length);
     }
   }
+  // Paires sans trajet sur la grille : réseau de routes et chemins de l'IGN
+  const net = new Map();
+  const missing = [];
+  for (let i = 0; i < nodes.length; i++)
+    for (let j = 0; j < nodes.length; j++) {
+      if (i === j || (runs && Number.isFinite(runs[i].time[cells[j]]))) continue;
+      if (i < j) missing.push([i, j]);
+    }
+  if (missing.length && missing.length <= 45) {
+    let done = 0;
+    const queue = [...missing];
+    const worker = async () => {
+      while (queue.length) {
+        const [i, j] = queue.shift();
+        const r = await networkLeg(nodes[i], nodes[j], signal);
+        net.set(`${i}>${j}`, r);
+        onProgress?.('reseau', ++done, missing.length);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+  }
+  const netLeg = (i, j) => {
+    const r = net.get(`${i}>${j}`);
+    if (r) return r;
+    const rev = net.get(`${j}>${i}`);
+    return rev ? { ...rev, legs: [...rev.legs].reverse().map((l) => ({ ...l, coords: [...l.coords].reverse() })) } : null;
+  };
   const cost = (i, j) => {
     const t = runs ? runs[i].time[cells[j]] : Infinity;
-    return Number.isFinite(t) ? t : distance(nodes[i], nodes[j]) / OFF_TRAIL;
+    if (Number.isFinite(t)) return t;
+    const r = netLeg(i, j);
+    return r ? r.duration : distance(nodes[i], nodes[j]) / OFF_TRAIL;
   };
   const order = solveOrder(cost, k, back);
 
   // Tracé de chaque étape
   const leg = (i, j) => {
-    if (!runs || !Number.isFinite(runs[i].time[cells[j]])) return straightLeg(nodes[i], nodes[j]);
+    if (!runs || !Number.isFinite(runs[i].time[cells[j]])) return netLeg(i, j) || noLeg(nodes[i], nodes[j]);
     const path = cellPath(runs[i].prev, cells[i], cells[j]);
     const sm = smoothPath(grid, path);
     const a = latLonOf(grid, cells[i]);
@@ -155,7 +221,8 @@ export async function planTour(start, points, { back = false, onProgress, signal
     legs,
     distance: legs.reduce((s, l) => s + l.distance, 0),
     duration: legs.reduce((s, l) => s + l.duration, 0),
-    offline: !grid || legs.some((l) => l.straight),
+    offline: legs.some((l) => l.none),
+    network: legs.some((l) => l.network),
     reason,
   };
 }

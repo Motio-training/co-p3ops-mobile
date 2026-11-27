@@ -171,10 +171,28 @@ export function PlanTab() {
     const r = wrapRef.current.getBoundingClientRect();
     pointers.current.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
     startGesture();
+    clearTimeout(gesture.current.long);
     if (pointers.current.size === 1) {
+      const sx = e.clientX - r.left;
+      const sy = e.clientY - r.top;
+      const hit = hitPoste(sx, sy);
       gesture.current.tap = { x: e.clientX, y: e.clientY, t: Date.now() };
+      gesture.current.moved = false;
       // Mode placement : appuyer sur un poste puis glisser le déplace
-      gesture.current.drag = chainRef.current ? hitPoste(e.clientX - r.left, e.clientY - r.top) : null;
+      gesture.current.drag = chainRef.current ? hit : null;
+      // Sinon, appui long (½ seconde) sur un poste : il « décolle » (vibration), on le fait glisser
+      if (hit != null && !chainRef.current) {
+        const g0 = gesture.current;
+        g0.long = setTimeout(() => {
+          if (gesture.current !== g0 || !g0.tap) return;
+          g0.drag = hit;
+          g0.tap = null;
+          g0.longDrag = true;
+          if (navigator.vibrate) navigator.vibrate(40);
+          setDrag({ code: hit, ...screenToLatLon(sx, sy) });
+          setFollow(false);
+        }, 500);
+      }
     } else gesture.current.drag = null;
   };
 
@@ -199,10 +217,14 @@ export function PlanTab() {
     pointers.current.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
     const g = gesture.current;
     if (!g) return;
-    if (g.tap && Math.hypot(e.clientX - g.tap.x, e.clientY - g.tap.y) > 8) g.tap = null;
+    if (g.tap && Math.hypot(e.clientX - g.tap.x, e.clientY - g.tap.y) > 8) {
+      g.tap = null;
+      if (!g.longDrag) clearTimeout(g.long); // la carte glisse : pas d'appui long
+    }
     if (g.tap) return;
     if (g.drag != null && pointers.current.size === 1) {
       const q = pointers.current.get(e.pointerId);
+      g.moved = true;
       setDrag({ code: g.drag, ...screenToLatLon(q.x, q.y) });
       return;
     }
@@ -232,7 +254,8 @@ export function PlanTab() {
   const onPointerUp = (e) => {
     const g = gesture.current;
     const wasTap = g?.tap && pointers.current.size === 1 && Date.now() - g.tap.t < 500;
-    if (g?.drag != null && !wasTap && drag && drag.code === g.drag) {
+    clearTimeout(g?.long);
+    if (g?.drag != null && !wasTap && g.moved && drag && drag.code === g.drag) {
       const code = g.drag;
       setBalisePosition(code, { lat: drag.lat, lon: drag.lon, acc: null, source: 'manuel' })
         .then(() => toast(`Poste ${code} déplacé.`, 'success'))
@@ -240,7 +263,7 @@ export function PlanTab() {
         .finally(() => setDrag(null));
       setSelected(code);
       if (placingRef.current === code) setPlacing(null);
-    }
+    } else if (g?.longDrag) setDrag(null);
     pointers.current.delete(e.pointerId);
     if (wasTap) {
       const r = wrapRef.current.getBoundingClientRect();
@@ -248,6 +271,7 @@ export function PlanTab() {
     }
     if (pointers.current.size) startGesture();
     else gesture.current = null;
+    if (gesture.current) gesture.current.drag = null;
     if (gesture.current) gesture.current.tap = null;
   };
 
@@ -472,7 +496,7 @@ export function PlanTab() {
       const p = toScreen(at.lat, at.lon);
       const rank = multi && route ? route.order.findIndex((o) => o.code === b.code) : -1;
       const picked = multi ? picks.includes(b.code) : b.code === selected;
-      return html`<div key=${b.code} class=${'map-poste' + (b.pos.source === 'gps' ? ' gps' : ' manuel') + (picked ? ' sel' : '')} style=${`left:${p.x}px;top:${p.y}px`}>
+      return html`<div key=${b.code} class=${'map-poste' + (b.pos.source === 'gps' ? ' gps' : ' manuel') + (picked ? ' sel' : '') + (drag && drag.code === b.code ? ' dragging' : '')} style=${`left:${p.x}px;top:${p.y}px`}>
         <div class="map-poste-in" style=${`transform:rotate(${v.bearing}deg)`}><span>${b.code}</span>${rank >= 0 && html`<b class="map-order">${rank + 1}</b>`}</div>
       </div>`;
     });
@@ -571,7 +595,8 @@ export function PlanTab() {
 
   return html`<div class="plan">
     <div class=${'map-wrap' + (placing != null ? ' placing' : '')} ref=${wrapRef}
-      onPointerDown=${onPointerDown} onPointerMove=${onPointerMove} onPointerUp=${onPointerUp} onPointerCancel=${onPointerUp}>
+      onPointerDown=${onPointerDown} onPointerMove=${onPointerMove} onPointerUp=${onPointerUp} onPointerCancel=${onPointerUp}
+      onContextMenu=${(e) => e.preventDefault()}>
       <div class="map-rotor" style=${`left:${W / 2}px;top:${H / 2}px;transform:rotate(${-v.bearing}deg)`}>
         <div class="map-tilelayer">${tiles}</div>
         ${line}
@@ -639,7 +664,7 @@ export function PlanTab() {
     ${(route || routing) &&
     html`<div class="route-sum mt">
       ${routing && !route
-        ? html`<span>${routing.step === 'terrain' ? `Téléchargement du terrain de la zone… ${routing.done} / ${routing.total}` : `Calcul de l'itinéraire…${routing.total > 1 ? ` ${routing.done} / ${routing.total}` : ''}`}</span>`
+        ? html`<span>${routing.step === 'terrain' ? `Téléchargement du terrain de la zone… ${routing.done} / ${routing.total}` : routing.step === 'reseau' ? `Itinéraire par les routes et chemins… ${routing.done} / ${routing.total}` : `Calcul de l'itinéraire…${routing.total > 1 ? ` ${routing.done} / ${routing.total}` : ''}`}</span>`
         : html`<div>
               <div class="route-total"><${Icon} name="route" /> <strong>${fmtDistance(route.distance)}</strong> · <strong>${fmtWalk(route.duration)}</strong> à pied${routing ? ' · mise à jour…' : ''}</div>
               <div class="route-order">
@@ -647,12 +672,15 @@ export function PlanTab() {
               </div>
               ${route.legs.length > 1 &&
               html`<ol class="route-legs">
-                ${route.legs.map((l) => html`<li>${l.to ? html`Poste <b>${l.to.code}</b>` : 'Retour au départ'} : ${fmtDistance(l.distance)}, ${fmtWalk(l.duration)}</li>`)}
+                ${route.legs.map((l) => html`<li>${l.to ? html`Poste <b>${l.to.code}</b>` : 'Retour au départ'} : ${l.none ? `${fmtDistance(l.distance)} à vol d'oiseau (pas de tracé)` : `${fmtDistance(l.distance)}, ${fmtWalk(l.duration)}`}</li>`)}
               </ol>`}
               <div class="muted small">
                 ${route.offline
-                  ? route.reason || "Trajet à vol d'oiseau pour une partie de l'itinéraire."
-                  : "Trait plein : routes et chemins ; pointillés : à travers champs ou bois. Calcul d'après la BD TOPO de l'IGN (végétation, eau, bâtiments, haies, talus) : clôtures, cultures et dénivelé ne sont pas connus."}
+                  ? html`<b class="text-err">Pas d'itinéraire possible sans réseau vers : ${route.legs.filter((l) => l.none).map((l) => (l.to ? l.to.code : 'départ')).join(', ')}.</b>
+                      Distance à vol d'oiseau indiquée seulement. Avant de partir, enregistrez la zone (bouton « Enregistrer la zone ») avec une connexion.`
+                  : route.network
+                    ? route.reason || 'Itinéraire par les routes et chemins.'
+                    : "Trait plein : routes et chemins ; pointillés : à travers champs ou bois. Évite l'eau, les bâtiments, les propriétés bâties (cadastre), les haies, broussailles et escarpements. Non connus : clôtures des champs, cultures, dénivelé."}
                 ${!route.from.gps && ' Départ : centre de la carte (pas de position GPS).'}
               </div>
             </div>
@@ -683,7 +711,7 @@ export function PlanTab() {
           ? "Touchez les postes à rejoindre (sur la carte ou ci-dessous), dans n'importe quel ordre : CO - P3OPS calcule l'ordre de passage le plus rapide et trace l'itinéraire à pied."
           : chain
             ? "Mode placement : touchez la carte pour placer le poste indiqué (les postes pas encore placés s'enchaînent). Pour déplacer un poste déjà placé, touchez-le puis touchez son nouvel emplacement, ou faites-le glisser."
-            : "Touchez un poste : l'itinéraire à pied depuis votre position est tracé. « Placer / déplacer les postes » : placez-les à la main avant d'aller les contrôler ; sur place, le boîtier posé sur le lecteur, validez sa position GPS (onglet « Réglages des boîtiers »)."}
+            : "Touchez un poste : l'itinéraire à pied depuis votre position est tracé. Appui long sur un poste : faites-le glisser pour le déplacer. « Placer / déplacer les postes » : placez-les à la main avant d'aller les contrôler ; sur place, le boîtier posé sur le lecteur, validez sa position GPS (onglet « Réglages des boîtiers »)."}
         Cercle plein : position GPS ; pointillés : placé à la main.
       </p>
       <div class="picker-grid balise-grid">

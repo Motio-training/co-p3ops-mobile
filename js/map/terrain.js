@@ -11,15 +11,19 @@ export const TERRAIN_Z = 14; // découpage des téléchargements (carrés d'envi
 
 // Couches utiles et attributs demandés (le reste n'est pas téléchargé)
 const LAYERS = {
-  vegetation: ['zone_de_vegetation', 'nature'],
-  route: ['troncon_de_route', 'nature,acces_pieton,position_par_rapport_au_sol'],
-  eau: ['surface_hydrographique', 'nature,persistance,position_par_rapport_au_sol'],
-  cours: ['troncon_hydrographique', 'nature,persistance,position_par_rapport_au_sol,fictif'],
-  bati: ['batiment', 'nature'],
-  haie: ['haie', 'largeur'],
-  relief: ['ligne_orographique', 'nature'],
-  rail: ['troncon_de_voie_ferree', 'nature,position_par_rapport_au_sol'],
+  vegetation: ['BDTOPO_V3:zone_de_vegetation', 'nature'],
+  route: ['BDTOPO_V3:troncon_de_route', 'nature,acces_pieton,position_par_rapport_au_sol'],
+  eau: ['BDTOPO_V3:surface_hydrographique', 'nature,persistance,position_par_rapport_au_sol'],
+  cours: ['BDTOPO_V3:troncon_hydrographique', 'nature,persistance,position_par_rapport_au_sol,fictif'],
+  bati: ['BDTOPO_V3:batiment', 'nature'],
+  haie: ['BDTOPO_V3:haie', 'largeur'],
+  relief: ['BDTOPO_V3:ligne_orographique', 'nature'],
+  rail: ['BDTOPO_V3:troncon_de_voie_ferree', 'nature,position_par_rapport_au_sol'],
+  // Cadastre : une parcelle bâtie (maison et jardin) est une propriété close, contournée
+  parcelle: ['CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle', 'contenance', 'geom'],
 };
+// Couches indispensables : sans elles, pas d'itinéraire à travers champs (on ne traverserait pas une maison)
+const REQUIRED = new Set(['route', 'eau', 'bati']);
 
 // Vitesses de marche (m/s). 0 = infranchissable.
 export const SPEED = {
@@ -46,6 +50,8 @@ export const SPEED = {
   eauIntermittente: 0.3,
   talus: 0.3,
   rail: 0.05,
+  prive: 0.03, // propriété close (parcelle bâtie) : traversée seulement si le poste s'y trouve
+  priveMaxM2: 15000, // au-delà (ferme, terrain militaire, grand domaine…), seuls les bâtiments sont évités
 };
 
 const keyOf = (x, y) => `${x}/${y}`;
@@ -67,11 +73,11 @@ export function terrainTiles(b) {
   return list;
 }
 
-function wfsUrl(layer, props, b, start = 0) {
+function wfsUrl(layer, props, b, start = 0, geom = 'geometrie') {
   return (
-    `${WFS}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=BDTOPO_V3:${layer}&SRSNAME=EPSG:4326` +
+    `${WFS}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=${layer}&SRSNAME=EPSG:4326` +
     `&BBOX=${b.south.toFixed(6)},${b.west.toFixed(6)},${b.north.toFixed(6)},${b.east.toFixed(6)},urn:ogc:def:crs:EPSG::4326` +
-    `&OUTPUTFORMAT=application/json&COUNT=5000&STARTINDEX=${start}&PROPERTYNAME=${props},geometrie`
+    `&OUTPUTFORMAT=application/json&COUNT=5000&STARTINDEX=${start}&PROPERTYNAME=${props},${geom}`
   );
 }
 
@@ -94,14 +100,22 @@ async function loadTile(x, y, signal) {
   if (memo.has(k)) return memo.get(k);
   const b = tileBounds(x, y);
   const out = {};
-  for (const [name, [layer, props]] of Object.entries(LAYERS)) {
+  let complete = true;
+  for (const [name, [layer, props, geom]] of Object.entries(LAYERS)) {
     out[name] = [];
-    for (let start = 0, page = 0; page < 6; page++, start += 5000) {
-      const d = await cachedJson(wfsUrl(layer, props, b, start), signal);
-      out[name].push(...(d.features || []));
-      if ((d.features || []).length < 5000) break;
+    try {
+      for (let start = 0, page = 0; page < 6; page++, start += 5000) {
+        const d = await cachedJson(wfsUrl(layer, props, b, start, geom), signal);
+        for (const f of d.features || []) out[name].push(f);
+        if ((d.features || []).length < 5000) break;
+      }
+    } catch (e) {
+      if (e.name === 'AbortError' || REQUIRED.has(name)) throw e;
+      out[name] = []; // couche secondaire indisponible : on continue sans elle
+      complete = false;
     }
   }
+  if (!complete) return out; // pas gardé en mémoire : nouvel essai au prochain calcul
   memo.set(k, out);
   return out;
 }
@@ -116,7 +130,7 @@ export async function loadTerrain(bounds, { onProgress, signal } = {}) {
     while (queue.length) {
       const t = queue.shift();
       const d = await loadTile(t.x, t.y, signal);
-      for (const k of Object.keys(data)) data[k].push(...d[k]);
+      for (const k of Object.keys(data)) for (const f of d[k]) data[k].push(f);
       onProgress?.(++done, tiles.length);
     }
   };
@@ -161,8 +175,8 @@ export function buildGrid(bounds, data, cs) {
   const polygons = (geom) => (geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : []);
   const lines = (geom) => (geom.type === 'LineString' ? [geom.coordinates] : geom.type === 'MultiLineString' ? geom.coordinates : []);
 
-  // Remplissage d'un polygone (règle pair-impair : les trous sont respectés)
-  const fill = (rings, value) => {
+  // Cellules d'un polygone (règle pair-impair : les trous sont respectés)
+  const fillCells = (rings, fn) => {
     const pts = rings.map((r) => r.map(([lon, lat]) => [gx(lon), gy(lat)]));
     let yMin = Infinity;
     let yMax = -Infinity;
@@ -182,10 +196,14 @@ export function buildGrid(bounds, data, cs) {
       for (let k = 0; k + 1 < xs.length; k += 2) {
         const a = Math.max(0, Math.ceil(xs[k] - 0.5));
         const b = Math.min(w - 1, Math.floor(xs[k + 1] - 0.5));
-        for (let col = a; col <= b; col++) speed[row * w + col] = value;
+        for (let col = a; col <= b; col++) fn(row * w + col);
       }
     }
   };
+  const fill = (rings, value) =>
+    fillCells(rings, (i) => {
+      speed[i] = value;
+    });
 
   // Tracé d'une ligne épaisse (largeur en cellules)
   const stroke = (coords, value, width = 1, isRoad = false) => {
@@ -239,7 +257,26 @@ export function buildGrid(bounds, data, cs) {
     const v = /intermittent/i.test(f.properties?.persistance || '') ? SPEED.eauIntermittente : 0;
     for (const p of polygons(f.geometry)) fill(p, v);
   }
-  for (const f of data.bati) if (f.geometry) for (const p of polygons(f.geometry)) fill(p, 0);
+  const built = new Uint8Array(w * h);
+  for (const f of data.bati)
+    if (f.geometry)
+      for (const p of polygons(f.geometry))
+        fillCells(p, (i) => {
+          speed[i] = 0;
+          built[i] = 1;
+        });
+  // Parcelles bâties (maisons avec jardin, cours…) : propriétés closes, contournées par les rues
+  for (const f of data.parcelle || []) {
+    if (!f.geometry || !(Number(f.properties?.contenance) <= SPEED.priveMaxM2)) continue;
+    const list = [];
+    let hasBuilding = false;
+    for (const p of polygons(f.geometry))
+      fillCells(p, (i) => {
+        list.push(i);
+        if (built[i]) hasBuilding = true;
+      });
+    if (hasBuilding) for (const i of list) if (speed[i] > SPEED.prive) speed[i] = SPEED.prive;
+  }
   for (const f of data.rail) if (f.geometry && !underground(f)) for (const l of lines(f.geometry)) stroke(l, SPEED.rail, cells(4));
   // 4. Routes et chemins (en dernier : ponts, passages). Autoroutes : infranchissables, sauf ponts.
   const roads = data.route.filter((f) => f.geometry && !underground(f));
@@ -253,7 +290,7 @@ export function buildGrid(bounds, data, cs) {
     const width = /route|rond/i.test(n) ? cells(6) : 1;
     for (const l of lines(f.geometry)) stroke(l, v, width, true);
   }
-  return { w, h, cs, speed, road, lat0, lon0, mLat, mLon };
+  return { w, h, cs, speed, road, private: null, lat0, lon0, mLat, mLon };
 }
 
 export const cellOf = (g, p) => {
@@ -384,7 +421,7 @@ export function cellPath(prev, src, dst) {
 }
 
 /** Temps (s) et part sur route d'un segment droit entre deux cellules (null si infranchissable). */
-function segmentCost(g, a, b) {
+function segmentCost(g, a, b, real = false) {
   const ax = (a % g.w) + 0.5;
   const ay = Math.floor(a / g.w) + 0.5;
   const bx = (b % g.w) + 0.5;
@@ -397,8 +434,10 @@ function segmentCost(g, a, b) {
     const x = Math.floor(ax + ((bx - ax) * (s + 0.5)) / steps);
     const y = Math.floor(ay + ((by - ay) * (s + 0.5)) / steps);
     const i = y * g.w + x;
-    const v = g.speed[i];
+    let v = g.speed[i];
     if (!v && i !== a && i !== b) return null;
+    // durée affichée : l'accès inévitable à un poste situé dans une propriété se fait à pied normalement
+    if (real && v > 0 && v <= SPEED.prive) v = SPEED.ouvert;
     t += (len * g.cs) / steps / (v || 0.05);
     onRoad += g.road[i];
   }
@@ -437,7 +476,7 @@ export function smoothPath(g, path) {
   let distance = 0;
   let duration = 0;
   for (let k = 1; k < keep.length; k++) {
-    const c = segmentCost(g, keep[k - 1], keep[k]) || { t: 0, road: 0 };
+    const c = segmentCost(g, keep[k - 1], keep[k], true) || { t: 0, road: 0 };
     const a = latLonOf(g, keep[k - 1]);
     const b = latLonOf(g, keep[k]);
     const off = c.road < 0.6;
