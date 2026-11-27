@@ -5007,3 +5007,100 @@ button.rank-row {
     min-height: 300px;
   }
 }
+
+/* Itinéraire à pied sur le plan */
+.map-route {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.map-route polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.map-route .casing {
+  stroke: #fff;
+  stroke-width: 9;
+  opacity: 0.85;
+}
+.map-route .on {
+  stroke: #e8590c;
+  stroke-width: 5;
+}
+.map-route .off {
+  stroke: #e8590c;
+  stroke-width: 4;
+  stroke-dasharray: 2 8;
+}
+.map-order {
+  position: absolute;
+  left: -12px;
+  top: -12px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
+  background: #e8590c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+.route-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+}
+.route-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+}
+.route-order {
+  margin: 4px 0;
+}
+.route-legs {
+  margin: 4px 0 6px 18px;
+  font-size: 13px;
+}
+.plan-modes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.chip-rank {
+  margin-left: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #e8590c;
+}
+
+/* Validation de la position GPS d'un poste (boîtier posé sur le lecteur) */
+.poste-pos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--info-soft);
+  border: 1px solid var(--border);
+}
+.poste-pos strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}

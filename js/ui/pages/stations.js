@@ -5,12 +5,12 @@ import { station, humanError } from '../../sportident/station.js';
 import { CONFIG_MODES, MODE_NAMES, MODE_READOUT, isControlMode } from '../../sportident/constants.js';
 import { Badge, Button, Card, Field, Icon, PageHeader, Segmented, EmptyState } from '../components.js';
 import { useSettings, useStation } from '../hooks.js';
-import { addBalises, noteBaliseChecked, noteStationChecked, refineBalisePosition, removeBalise, stationInfo } from '../../core/settings.js';
+import { addBalises, noteBaliseChecked, noteStationChecked, refineBalisePosition, removeBalise, setBalisePosition, stationInfo } from '../../core/settings.js';
 import { parseCodeList } from './control-picker.js';
 import { StationPanel } from './readout.js';
 import { ChipsPanel } from './chips.js';
 import { PlanTab } from './map.js';
-import { currentFix, gpsWasEnabled } from '../../map/gps.js';
+import { currentFix, gps, gpsWasEnabled, onGps, startGps } from '../../map/gps.js';
 
 const distanceM = (a, b) => {
   const r = Math.PI / 180;
@@ -100,6 +100,49 @@ function InfoGrid({ info, onSyncClock, busy }) {
     </dd>
     ${info.memoryOverflow && html`<dt>Mémoire</dt><dd class="text-warn">mémoire de sauvegarde pleine</dd>`}
   </dl>`;
+}
+
+/**
+ * Boîtier « poste » posé sur le lecteur : on est au poste. Sa position sur le plan est validée avec le GPS
+ * de l'appareil (téléphone, tablette).
+ */
+function PostePosition({ code }) {
+  const st = useSettings();
+  const [, redraw] = useState(0);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    startGps();
+    return onGps(() => redraw((n) => n + 1));
+  }, []);
+  const pos = st.balises.find((b) => b.code === code)?.pos;
+  const fix = gps.fix && Date.now() - gps.fix.at < 30000 ? gps.fix : null;
+  const validate = async () => {
+    setSaving(true);
+    try {
+      await setBalisePosition(code, { lat: fix.lat, lon: fix.lon, acc: Math.round(fix.acc), source: 'gps' });
+      toast(`Position du poste ${code} validée au GPS (±${Math.round(fix.acc)} m).`, 'success');
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return html`<div class="poste-pos mt">
+    <div>
+      <strong><${Icon} name="pin" size=${16} /> Position du poste ${code} sur le plan</strong>
+      <div class="small">
+        ${pos
+          ? pos.source === 'gps'
+            ? `GPS ±${pos.acc ?? '?'} m, le ${new Date(pos.at).toLocaleDateString('fr-FR')}`
+            : `placé à la main le ${new Date(pos.at).toLocaleDateString('fr-FR')} (à préciser)`
+          : 'pas encore placé'}
+      </div>
+      <div class="small muted">${fix ? `Votre position : ±${Math.round(fix.acc)} m${fix.acc > 30 ? ' (attendez un meilleur signal)' : ''}` : gps.error || 'Recherche du signal GPS…'}</div>
+    </div>
+    <${Button} small variant=${pos?.source === 'gps' ? 'secondary' : 'primary'} icon="crosshair" onClick=${validate} disabled=${!fix || fix.acc > 60 || saving}>
+      Valider la position GPS${fix ? ` (±${Math.round(fix.acc)} m)` : ''}
+    </${Button}>
+  </div>`;
 }
 
 /** Balises connues de l'application : elles servent au choix des balises des circuits. */
@@ -330,6 +373,7 @@ function StationsTab() {
         html`<div class="mt">
           ${!info && html`<p class="muted small">Dernier boîtier programmé :</p>`}
           <${InfoGrid} info=${shown} onSyncClock=${syncClock} busy=${busy} />
+          ${remote && isControlMode(shown.mode) && shown.code && html`<${PostePosition} code=${shown.code} />`}
         </div>`}
       <//>
 

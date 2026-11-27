@@ -9,8 +9,26 @@ document.documentElement.classList.add('mobile-app');
 
 // (Dans l'application Android, les fichiers sont déjà dans l'APK : pas de mise en cache.)
 if ('serviceWorker' in navigator && location.protocol !== 'file:' && !window.__P3OPS_APK) {
+  // Une mise à jour a été installée pendant que l'ancienne version était affichée : on recharge pour
+  // l'afficher tout de suite (sauf si le lecteur de puces est branché : on ne coupe pas une lecture).
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', async () => {
+    if (!hadController || reloading) return;
+    const { station } = await import('../sportident/station.js');
+    if (station.connected && !station.simulated) {
+      const { toast } = await import('../core/bus.js');
+      toast("Nouvelle version de CO - P3OPS installée : elle s'affichera à la prochaine ouverture.", 'info', { duration: 10000 });
+      return;
+    }
+    reloading = true;
+    location.reload();
+  });
   addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker
+      .register('sw.js')
+      .then((reg) => reg.update())
+      .catch(() => {});
   });
 }
 

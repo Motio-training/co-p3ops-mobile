@@ -155,5 +155,179 @@
    "checkedAt": 1795773268601
   }
  ],
- "boitiers": []
+ "boitiers": [
+  {
+   "serial": 513591,
+   "history": [
+    {
+     "at": 1795773345317,
+     "action": "Contrôle",
+     "mode": 5,
+     "code": 48,
+     "battery": 100,
+     "drift": 4102
+    },
+    {
+     "at": 1795710013122,
+     "action": "Contrôle",
+     "mode": 5,
+     "code": 48,
+     "battery": null,
+     "drift": null
+    }
+   ],
+   "model": "BSM8",
+   "mode": 5,
+   "code": 48,
+   "battery": 100,
+   "capacityMah": null,
+   "usedMah": null,
+   "batteryDate": null,
+   "drift": 4102,
+   "firstSeenAt": 1795710013122,
+   "checkedAt": 1795773345317
+  },
+  {
+   "serial": 597577,
+   "history": [
+    {
+     "at": 1795773268601,
+     "action": "Contrôle",
+     "mode": 2,
+     "code": 50,
+     "battery": 99,
+     "drift": 0
+    },
+    {
+     "at": 1795772727791,
+     "action": "Programmé",
+     "mode": 2,
+     "code": 50,
+     "battery": null,
+     "drift": 0
+    },
+    {
+     "at": 1795772567077,
+     "action": "Programmé",
+     "mode": 2,
+     "code": 49,
+     "battery": null,
+     "drift": 0
+    },
+    {
+     "at": 1795772544264,
+     "action": "Programmé",
+     "mode": 2,
+     "code": 50,
+     "battery": null,
+     "drift": 0
+    },
+    {
+     "at": 1795772537508,
+     "action": "Contrôle",
+     "mode": 50,
+     "code": 50,
+     "battery": null,
+     "drift": 3608
+    }
+   ],
+   "model": "BSF8",
+   "mode": 2,
+   "code": 50,
+   "battery": 99,
+   "capacityMah": null,
+   "usedMah": null,
+   "batteryDate": null,
+   "drift": 0,
+   "firstSeenAt": 1795772537508,
+   "checkedAt": 1795773268601,
+   "programmedAt": 1795772727791
+  },
+  {
+   "serial": 513344,
+   "history": [
+    {
+     "at": 1795773204916,
+     "action": "Contrôle",
+     "mode": 3,
+     "code": 5,
+     "battery": 54,
+     "drift": 4061
+    }
+   ],
+   "model": "BSF8",
+   "mode": 3,
+   "code": 5,
+   "battery": 54,
+   "capacityMah": null,
+   "usedMah": null,
+   "batteryDate": null,
+   "drift": 4061,
+   "firstSeenAt": 1795773204916,
+   "checkedAt": 1795773204916
+  },
+  {
+   "serial": 556904,
+   "history": [
+    {
+     "at": 1795773252402,
+     "action": "Contrôle",
+     "mode": 7,
+     "code": 1,
+     "battery": 71,
+     "drift": 4102
+    }
+   ],
+   "model": "BS8-SI-Master",
+   "mode": 7,
+   "code": 1,
+   "battery": 71,
+   "capacityMah": null,
+   "usedMah": null,
+   "batteryDate": null,
+   "drift": 4102,
+   "firstSeenAt": 1795773252402,
+   "checkedAt": 1795773252402
+  },
+  {
+   "serial": 513348,
+   "history": [
+    {
+     "at": 1795773414222,
+     "action": "Mis à l'heure",
+     "mode": 4,
+     "code": 11,
+     "battery": 54,
+     "drift": 0
+    },
+    {
+     "at": 1795773411933,
+     "action": "Contrôle",
+     "mode": 4,
+     "code": 11,
+     "battery": 54,
+     "drift": 4060
+    },
+    {
+     "at": 1795773365870,
+     "action": "Contrôle",
+     "mode": 4,
+     "code": 11,
+     "battery": 54,
+     "drift": 4060
+    }
+   ],
+   "model": "BSF8",
+   "mode": 4,
+   "code": 11,
+   "battery": 54,
+   "capacityMah": null,
+   "usedMah": null,
+   "batteryDate": null,
+   "drift": 0,
+   "firstSeenAt": 1795773365870,
+   "checkedAt": 1795773414222,
+   "clockSetAt": 1795773414222
+  }
+ ]
 }
