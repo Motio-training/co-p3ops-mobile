@@ -47,6 +47,8 @@ export class SimulatedPort {
       clockOffset: -13 * 60 * 1000,
     };
     this.remotePresent = true;
+    this.remoteWarmup = 2; // comme un vrai BSM8 : les 2 premières commandes après le passage en distant sont refusées
+    this.warmupLeft = 0;
     this.target = 'M';
     this.card = null;
     this.readable = null;
@@ -121,14 +123,22 @@ export class SimulatedPort {
   }
 
   handle({ cmd, data }) {
-    // En mode distant sans boîtier posé dessus, seules les commandes du lecteur répondent.
-    if (this.target === 'S' && !this.remotePresent && cmd !== CMD.SET_MS) return;
+    // En mode distant : refus (NAK) tant que la liaison avec le boîtier posé dessus n'est pas établie,
+    // et toujours s'il n'y a pas de boîtier (comportement constaté avec BSM8 + BSF8).
+    if (this.target === 'S' && cmd !== CMD.SET_MS) {
+      if (!this.remotePresent) return this.send([NAK], 40);
+      if (this.warmupLeft > 0) {
+        this.warmupLeft--;
+        return this.send([NAK], 40);
+      }
+    }
     switch (cmd) {
       case CMD.SET_MS:
         this.target = data[0] === MS_REMOTE ? 'S' : 'M';
         this.target = 'M'; // la réponse vient du lecteur lui-même
         this.reply(CMD.SET_MS, [data[0]]);
         this.target = data[0] === MS_REMOTE ? 'S' : 'M';
+        this.warmupLeft = this.target === 'S' ? this.remoteWarmup : 0;
         return;
       case CMD.GET_SYS_VAL: {
         const [adr, len] = data;

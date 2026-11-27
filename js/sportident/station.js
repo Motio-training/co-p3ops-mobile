@@ -357,9 +357,14 @@ export class Station extends EventTarget {
     if (this.reading) throw new Error('Une lecture de puce est en cours.');
     this.configuring = true;
     try {
-      if (remote) await this.setMs(MS_REMOTE);
+      if (remote) {
+        await this.setMs(MS_REMOTE);
+        await this.reachRemote();
+        this.remote = true;
+      }
       return await fn();
     } finally {
+      this.remote = false;
       if (remote) {
         try {
           await this.setMs(MS_DIRECT);
@@ -371,23 +376,60 @@ export class Station extends EventTarget {
     }
   }
 
+  /**
+   * Boîtier posé sur le lecteur : les premières commandes reçoivent souvent un refus (NAK) le temps que la
+   * liaison entre les deux boîtiers s'établisse (constaté avec BSM8 + BSF8). On insiste avant d'abandonner.
+   */
+  async reachRemote(maxMs = this.remoteWaitMs ?? 8000) {
+    const end = Date.now() + maxMs;
+    for (let i = 1; ; i++) {
+      try {
+        await this.command(CMD.GET_TIME, [], { timeout: 2500 });
+        return;
+      } catch (e) {
+        if (Date.now() >= end || (e.message !== 'nak' && e.message !== 'timeout')) {
+          throw new Error(
+            e.message === 'nak' || e.message === 'timeout'
+              ? "Le boîtier posé sur le lecteur ne répond pas. Réveillez-le (insérez une puce : il bipe), posez-le aussitôt contre le lecteur, zones de poinçonnage face à face, sans bouger, puis recommencez."
+              : e.message
+          );
+        }
+        this.log('i', null, `Boîtier posé sur le lecteur : pas encore de réponse (essai ${i})`);
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+  }
+
+  /** Commande vers le boîtier posé sur le lecteur : nouvel essai en cas de refus passager. */
+  async cmdRetry(cmd, params, opts) {
+    for (let i = 1; ; i++) {
+      try {
+        return await this.command(cmd, params, opts);
+      } catch (e) {
+        if (!this.remote || e.message !== 'nak' || i >= 4) throw e;
+        this.log('i', null, `Refus passager du boîtier, nouvel essai (${i})`);
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+  }
+
   async readSystem() {
-    const [f] = await this.command(CMD.GET_SYS_VAL, [0x00, 0x80], { timeout: 5000 });
+    const [f] = await this.cmdRetry(CMD.GET_SYS_VAL, [0x00, 0x80], { timeout: 5000 });
     if (f.data.length < 3 + 0x80 || f.data[2] !== 0x00) throw new Error('réponse incomplète du boîtier');
     return parseSystemData(f.data.subarray(3, 3 + 0x80));
   }
 
   async readClock() {
-    const [f] = await this.command(CMD.GET_TIME, [], { timeout: 4000 });
+    const [f] = await this.cmdRetry(CMD.GET_TIME, [], { timeout: 4000 });
     return decodeStationTime(f.data.subarray(2));
   }
 
   async setClock(date = new Date()) {
-    await this.command(CMD.SET_TIME, encodeStationTime(date), { timeout: 4000 });
+    await this.cmdRetry(CMD.SET_TIME, encodeStationTime(date), { timeout: 4000 });
   }
 
   async writeSys(address, bytes) {
-    const [f] = await this.command(CMD.SET_SYS_VAL, [address, ...bytes], { timeout: 4000 });
+    const [f] = await this.cmdRetry(CMD.SET_SYS_VAL, [address, ...bytes], { timeout: 4000 });
     if (f.data[2] !== address) throw new Error("le boîtier n'a pas confirmé l'écriture");
   }
 
